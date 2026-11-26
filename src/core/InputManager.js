@@ -21,10 +21,12 @@ export class InputManager {
     this.lookDeltaX = 0;
     this.lookDeltaY = 0;
 
-    // Interaction triggers
+    // Interaction & combat triggers
     this.interactJustPressed = false;
+    this.punchJustPressed = false;
     this.interactHeld = false;
     this._eKeyDown = false;
+    this._fKeyDown = false;
     this._mouseHeld = false;
     this._mobileInteractHeld = false;
 
@@ -92,9 +94,12 @@ export class InputManager {
     }
     if (open) {
       this._eKeyDown = false;
+      this._fKeyDown = false;
       this._mouseHeld = false;
       this._mobileInteractHeld = false;
       this.interactHeld = false;
+      this.punchJustPressed = false;
+      this.sprint = false;
       this.moveX = 0;
       this.moveY = 0;
       this._resetJoystick();
@@ -125,6 +130,12 @@ export class InputManager {
   consumeInteractPress() {
     const v = this.interactJustPressed;
     this.interactJustPressed = false;
+    return v;
+  }
+
+  consumePunchPress() {
+    const v = this.punchJustPressed;
+    this.punchJustPressed = false;
     return v;
   }
 
@@ -178,6 +189,10 @@ export class InputManager {
         this._eKeyDown = true;
         this.interactJustPressed = true;
       }
+      if (e.code === 'KeyF' && !e.repeat) {
+        this._fKeyDown = true;
+        this.punchJustPressed = true;
+      }
     });
 
     window.addEventListener('keyup', (e) => {
@@ -185,11 +200,15 @@ export class InputManager {
       if (e.code === 'KeyE') {
         this._eKeyDown = false;
       }
+      if (e.code === 'KeyF') {
+        this._fKeyDown = false;
+      }
     });
 
     window.addEventListener('blur', () => {
       for (const k in this.keys) this.keys[k] = false;
       this._eKeyDown = false;
+      this._fKeyDown = false;
       this._mouseHeld = false;
       this.moveX = 0;
       this.moveY = 0;
@@ -332,6 +351,7 @@ export class InputManager {
     });
 
     const btnSprint = document.getElementById('btn-mobile-sprint');
+    let lastSprintTouchMs = 0;
     const toggleMobileSprint = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -339,9 +359,17 @@ export class InputManager {
       this.sprint = this.mobileSprintToggle;
       btnSprint.classList.toggle('active', this.mobileSprintToggle);
     };
-    btnSprint.addEventListener('touchstart', toggleMobileSprint, { passive: false });
+    btnSprint.addEventListener(
+      'touchstart',
+      (e) => {
+        lastSprintTouchMs = performance.now();
+        toggleMobileSprint(e);
+      },
+      { passive: false }
+    );
     btnSprint.addEventListener('click', (e) => {
-      // Only handle mouse clicks in mobile simulation
+      // Only handle desktop mouse fallback (skip synthetic post-touch click)
+      if (performance.now() - lastSprintTouchMs < 450) return;
       if (e.pointerType !== 'touch') toggleMobileSprint(e);
     });
   }

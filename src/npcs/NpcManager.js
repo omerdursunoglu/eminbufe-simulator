@@ -1,13 +1,34 @@
 // Waypoint navigation & behavior controller for terminal travelers, fridge customers, and 3 story NPCs
 
+const SOFRA_EXIT_PATH = [
+  { x: 2.35, z: -1.5 },
+  { x: 2.75, z: 1.8 },
+  { x: 1.8, z: 4.4 }
+];
+
+const SOFRA_PANIC_LOOP = [
+  { x: 0.0, z: 10.8 },
+  { x: 13.0, z: 10.8 },
+  { x: 13.0, z: 18.2 },
+  { x: 0.0, z: 19.5 },
+  { x: -13.0, z: 18.2 },
+  { x: -13.0, z: 10.8 },
+  { x: -2.2, z: 10.8 },
+  { x: -2.2, z: 4.4 },
+  { x: 2.0, z: 4.4 }
+];
+
 export class NpcManager {
-  constructor(factory, bufe, sound) {
+  constructor(factory, bufe, sound, colliders = null) {
     this.factory = factory;
     this.bufe = bufe;
     this.sound = sound;
+    this.colliders = colliders;
 
     this.npcs = [];
     this.storyNpc = null;
+    this._ringPulse = 0;
+    this._hitRes = { hit: false, type: null, knockedOut: false, hp: 0, maxHp: 0, hitCount: 0 };
 
     // Key waypoints across Tokat Terminal & Emin Bufe (conflict-free paths)
     this.points = {
@@ -131,12 +152,24 @@ export class NpcManager {
       waypoints: [],
       wpIndex: 0,
       loop: false,
-      state: 'inactive', // 'walking_in' | 'waiting_talk' | 'chased' | 'sabotage_throw' | 'leaving' | 'inactive'
+      state: 'inactive', // 'walking_in' | 'waiting_talk' | 'chased' | 'sabotage_throw' | 'sofra_flee' | 'knocked_down' | 'leaving' | 'inactive'
       waitTimer: 0,
       panic: false,
       gestureArm: 0,
       active: false,
-      onReachGoal: null
+      onReachGoal: null,
+      colors: { skin: 0xe0ac69, jacket: 0xbe123c, pants: 0x111827, hair: 0x09090b },
+      hp: 5,
+      maxHp: 5,
+      hitCount: 0,
+      hitFlashTimer: 0,
+      flashing: false,
+      staggerTimer: 0,
+      knockdownTimer: 0,
+      fleeBurstTimer: 0,
+      sofraPhase: 'exit',
+      tauntTimer: 0,
+      taunted: false
     };
     this.npcs.push(this.storyNpc);
   }
@@ -166,12 +199,22 @@ export class NpcManager {
     s.active = true;
     s.panic = false;
     s.gestureArm = 0;
+    s.hitCount = 0;
+    s.hitFlashTimer = 0;
+    s.flashing = false;
+    s.staggerTimer = 0;
+    s.knockdownTimer = 0;
+    s.fleeBurstTimer = 0;
+    s.taunted = false;
 
     if (eventType === 'icecream') {
-      this.factory.setNpcColors(s.slot, 0xf1c27d, 0xef4444, 0x1e293b, 0x292524);
+      s.colors = { skin: 0xf1c27d, jacket: 0xef4444, pants: 0x1e293b, hair: 0x292524 };
+      this.factory.setNpcColors(s.slot, s.colors.skin, s.colors.jacket, s.colors.pants, s.colors.hair);
       s.x = -11.0;
       s.z = 5.5;
       s.speed = 2.5;
+      s.hp = 3;
+      s.maxHp = 3;
       s.state = 'walking_in';
       s.waypoints = [
         { x: 2.55, z: 2.2 },
@@ -179,10 +222,13 @@ export class NpcManager {
       ];
       s.wpIndex = 0;
     } else if (eventType === 'wifi') {
-      this.factory.setNpcColors(s.slot, 0xffdbac, 0x0ea5e9, 0x334155, 0x451a03);
+      s.colors = { skin: 0xffdbac, jacket: 0x0ea5e9, pants: 0x334155, hair: 0x451a03 };
+      this.factory.setNpcColors(s.slot, s.colors.skin, s.colors.jacket, s.colors.pants, s.colors.hair);
       s.x = 12.0;
       s.z = 6.0;
       s.speed = 2.4;
+      s.hp = 1;
+      s.maxHp = 1;
       s.state = 'walking_in';
       s.waypoints = [
         { x: 2.75, z: 2.2 },
@@ -190,10 +236,13 @@ export class NpcManager {
       ];
       s.wpIndex = 0;
     } else if (eventType === 'sofra') {
-      this.factory.setNpcColors(s.slot, 0xe0ac69, 0xbe123c, 0x111827, 0x09090b);
+      s.colors = { skin: 0xe0ac69, jacket: 0xbe123c, pants: 0x111827, hair: 0x09090b };
+      this.factory.setNpcColors(s.slot, s.colors.skin, s.colors.jacket, s.colors.pants, s.colors.hair);
       s.x = 10.5;
       s.z = 4.2;
       s.speed = 2.85;
+      s.hp = 5;
+      s.maxHp = 5;
       s.state = 'walking_in';
       s.waypoints = [
         { x: 2.6, z: 1.6 },
@@ -215,6 +264,97 @@ export class NpcManager {
       { x: 0.0, z: 22.0 }
     ];
     s.wpIndex = 0;
+  }
+
+  startSofraChase() {
+    const s = this.storyNpc;
+    s.state = 'sofra_flee';
+    s.panic = true;
+    s.gestureArm = 0;
+    s.speed = 5.8;
+    s.hp = s.maxHp;
+    s.hitCount = 0;
+    s.fleeBurstTimer = 0.8;
+    s.tauntTimer = 6.5;
+    s.taunted = false;
+    s.sofraPhase = 'exit';
+    s.waypoints = SOFRA_EXIT_PATH;
+    s.wpIndex = 0;
+  }
+
+  isStoryNpcInHitRange(playerPos, lookForward, maxRange = 2.65) {
+    const s = this.storyNpc;
+    if (!s.active || (s.state !== 'sofra_flee' && s.state !== 'chased')) return false;
+    // Prevent hitting through the solid center shop divider wall
+    if (playerPos.z < -0.2 && s.z < -0.2 && playerPos.x * s.x < -0.04) return false;
+
+    const dx = s.x - playerPos.x;
+    const dz = s.z - playerPos.z;
+    const distSq = dx * dx + dz * dz;
+    if (distSq > maxRange * maxRange) return false;
+
+    const dist = Math.sqrt(distSq);
+    if (dist <= 1.2) return true;
+
+    const fLen = Math.hypot(lookForward.x, lookForward.z);
+    if (fLen < 0.001) return true;
+    const dot = ((dx / dist) * lookForward.x + (dz / dist) * lookForward.z) / fLen;
+    return dot >= 0.24;
+  }
+
+  tryHitStoryNpc(playerPos, lookForward, maxRange = 2.65) {
+    const res = this._hitRes;
+    res.hit = false;
+    res.type = null;
+    res.knockedOut = false;
+
+    if (!this.isStoryNpcInHitRange(playerPos, lookForward, maxRange)) {
+      return res;
+    }
+
+    const s = this.storyNpc;
+    res.hit = true;
+    res.type = s.eventType;
+    s.hitCount++;
+
+    // Knockback away from player (with +Z bias if still inside shop so NPC gets knocked toward terminal hall)
+    let dx = s.x - playerPos.x;
+    let dz = s.z - playerPos.z;
+    if (s.z < 0.25) dz += 0.65;
+    const len = Math.hypot(dx, dz) || 1;
+    dx /= len;
+    dz /= len;
+
+    const knockDist = s.state === 'sofra_flee' ? 1.05 : 1.15;
+    s.x += dx * knockDist;
+    s.z += dz * knockDist;
+    this.colliders?.resolve(s, 0.3);
+
+    s.hitFlashTimer = 0.22;
+    s.staggerTimer = 0.34;
+    s.fleeBurstTimer = 1.25;
+    this.factory.spawnImpactBurst(s.x, 1.32, s.z);
+
+    if (s.state === 'sofra_flee') {
+      s.hp = Math.max(0, s.hp - 1);
+      res.hp = s.hp;
+      res.maxHp = s.maxHp;
+      res.hitCount = s.hitCount;
+
+      if (s.hp <= 0) {
+        s.state = 'knocked_down';
+        s.knockdownTimer = 3.2;
+        s.panic = false;
+        s.gestureArm = 0;
+        s.speed = 0;
+        res.knockedOut = true;
+      }
+    } else {
+      res.hp = s.hp;
+      res.maxHp = s.maxHp;
+      res.hitCount = s.hitCount;
+    }
+    return res;
   }
 
   dismissStoryNpc() {
@@ -303,7 +443,22 @@ export class NpcManager {
 
     // 3. Story NPC
     const s = this.storyNpc;
+    let showTargetRing = false;
     if (s.active) {
+      if (s.hitFlashTimer > 0) {
+        s.hitFlashTimer = Math.max(0, s.hitFlashTimer - dt);
+        if (!s.flashing) {
+          this.factory.setNpcHitFlash(s.slot);
+          s.flashing = true;
+        }
+      } else if (s.flashing) {
+        this.factory.setNpcColors(s.slot, s.colors.skin, s.colors.jacket, s.colors.pants, s.colors.hair);
+        s.flashing = false;
+      }
+
+      if (s.staggerTimer > 0) s.staggerTimer = Math.max(0, s.staggerTimer - dt);
+      if (s.fleeBurstTimer > 0) s.fleeBurstTimer = Math.max(0, s.fleeBurstTimer - dt);
+
       if (s.state === 'walking_in') {
         const target = s.waypoints[s.wpIndex];
         if (this._stepTowards(s, target.x, target.z, s.speed, dt)) {
@@ -340,7 +495,8 @@ export class NpcManager {
           s.ry = Math.atan2(playerPos.x - s.x, playerPos.z - s.z);
           s.walkCycle += dt * 4.0;
         } else {
-          const chaseSpeed = distPlayer < 3.2 ? 7.7 : distPlayer < 6.5 ? 6.2 : 4.2;
+          const chaseSpeed =
+            s.staggerTimer > 0.18 ? 1.5 : distPlayer < 3.2 ? 7.7 : distPlayer < 6.5 ? 6.2 : 4.2;
           if (this._stepTowards(s, target.x, target.z, chaseSpeed, dt)) {
             s.wpIndex++;
             if (s.wpIndex >= s.waypoints.length) {
@@ -349,6 +505,7 @@ export class NpcManager {
               storyCallbacks.onChaseEscapedExit?.();
             }
           }
+          this.colliders?.resolve(s, 0.3);
         }
       } else if (s.state === 'sabotage_throw') {
         s.waitTimer -= dt;
@@ -356,11 +513,74 @@ export class NpcManager {
         if (s.waitTimer <= 0) {
           s.gestureArm = 0;
           storyCallbacks.onSabotageScattered?.();
+        }
+      } else if (s.state === 'sofra_flee') {
+        showTargetRing = true;
+        this._ringPulse += dt * 6.0;
+        const distPlayer = Math.hypot(playerPos.x - s.x, playerPos.z - s.z);
+
+        // Prompt hint if player hasn't caught up yet
+        if (!s.taunted && s.hitCount === 0) {
+          s.tauntTimer -= dt;
+          if (s.tauntTimer <= 0 && distPlayer > 4.5) {
+            s.taunted = true;
+            storyCallbacks.onSofraTaunt?.();
+          }
+        }
+
+        // If out in the terminal hall and player blocks the current waypoint, skip ahead to evade!
+        if (s.sofraPhase === 'loop' && distPlayer < 3.6) {
+          const curTarget = s.waypoints[s.wpIndex];
+          const tx = curTarget.x - s.x;
+          const tz = curTarget.z - s.z;
+          const px = playerPos.x - s.x;
+          const pz = playerPos.z - s.z;
+          const tLen = Math.hypot(tx, tz) || 1;
+          const pLen = Math.hypot(px, pz) || 1;
+          if ((tx * px + tz * pz) / (tLen * pLen) > 0.35) {
+            s.wpIndex = (s.wpIndex + 3) % s.waypoints.length;
+          }
+        }
+
+        const target = s.waypoints[s.wpIndex];
+        let fleeSpeed;
+        if (s.staggerTimer > 0.18) {
+          fleeSpeed = 1.4; // brief hitstun when struck
+        } else if (s.sofraPhase === 'exit') {
+          fleeSpeed = 6.0;
+        } else if (s.fleeBurstTimer > 0) {
+          fleeSpeed = 6.3; // panicked burst right after hit (sprint speed 8.3 still overtakes!)
+        } else if (distPlayer > 11.5) {
+          fleeSpeed = 3.6; // catch breath when far ahead so player can close distance
+        } else {
+          fleeSpeed = 5.35; // faster than walk (4.5), easily caught with Hızlı Koş (8.3)
+        }
+        s.speed = fleeSpeed;
+
+        if (this._stepTowards(s, target.x, target.z, fleeSpeed, dt)) {
+          s.wpIndex++;
+          if (s.sofraPhase === 'exit') {
+            if (s.wpIndex >= s.waypoints.length) {
+              s.sofraPhase = 'loop';
+              s.waypoints = SOFRA_PANIC_LOOP;
+              s.wpIndex = 0;
+            }
+          } else {
+            s.wpIndex %= s.waypoints.length;
+          }
+        }
+        this.colliders?.resolve(s, 0.3);
+      } else if (s.state === 'knocked_down') {
+        s.knockdownTimer -= dt;
+        s.walkCycle += dt * 4.0;
+        if (s.knockdownTimer <= 0) {
           s.state = 'leaving';
-          s.speed = 3.2;
+          s.speed = 1.65;
+          s.panic = false;
+          s.gestureArm = 0;
           s.waypoints = [
-            { x: 2.9, z: 1.5 },
-            { x: -14.5, z: 6.5 }
+            { x: s.x >= 0 ? 15.0 : -15.0, z: Math.max(4.5, s.z) },
+            { x: s.x >= 0 ? 18.0 : -18.0, z: 12.0 }
           ];
           s.wpIndex = 0;
         }
@@ -376,6 +596,8 @@ export class NpcManager {
       }
     }
 
+    this.factory.setTargetRing(showTargetRing, s.x, s.z, this._ringPulse);
+
     // 4. Sync ALL NPCs into the 5 InstancedMeshes
     for (let i = 0; i < this.npcs.length; i++) {
       const n = this.npcs[i];
@@ -388,7 +610,10 @@ export class NpcManager {
         n.state === 'going_fridge' ||
         n.state === 'leaving' ||
         n.state === 'walking_in' ||
-        n.state === 'chased';
+        n.state === 'chased' ||
+        n.state === 'sofra_flee';
+      const staggerAmt = n.staggerTimer ? Math.min(1, n.staggerTimer / 0.34) : 0;
+      const knockdownAmt = n.state === 'knocked_down' ? 1 : 0;
       this.factory.updateNpcPose(
         n.slot,
         n.x,
@@ -397,9 +622,12 @@ export class NpcManager {
         n.walkCycle,
         moving ? n.speed : 0,
         n.panic,
-        n.gestureArm
+        n.gestureArm,
+        staggerAmt,
+        knockdownAmt
       );
     }
+    this.factory.updateEffects(dt);
     this.factory.flush();
   }
 }

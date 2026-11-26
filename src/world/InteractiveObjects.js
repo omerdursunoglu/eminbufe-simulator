@@ -1,3 +1,5 @@
+import { QuestState } from '../quests/QuestStateMachine.js';
+
 // Zero-GC interaction finder checking NPC talk prompts, scattered sofra bezleri, fridges, crate, and Wi-Fi note
 
 export class InteractiveObjects {
@@ -23,8 +25,17 @@ export class InteractiveObjects {
     res.index = -1;
     res.holdable = false;
 
-    // 1. Scattered Sofra Bezleri (during Event 3 cleanup)
-    if (this.bufe.clothScattered) {
+    // 0. Sneaky Thief NPC in melee beatdown range (highest priority!)
+    if (npcManager.isThiefInHitRange(playerPos, lookForward, 3.0)) {
+      const t = npcManager.thiefNpc;
+      res.type = 'thief';
+      res.label = `Hırsızı Döv! ÇAT ÇUT (${t.hp}/${t.maxHp})`;
+      res.keyLabel = 'Tık/E';
+      return res;
+    }
+
+    // 1. Scattered Sofra Bezleri (during Event 3 cleanup after beating saboteur)
+    if (this.bufe.clothScattered && questState.state !== QuestState.EVENT_SOFRABEZI_CHASE) {
       let bestDistSq = 2.65 * 2.65;
       let bestIdx = -1;
       const items = this.bufe.clothItems;

@@ -12,6 +12,9 @@
   <!-- Anger / Rage Vignette -->
   <div id="rage-vignette" class="rage-vignette hidden"></div>
 
+  <!-- Comic Impact Popups ("ÇAT!", "ÇUT!", "NAKAVT!") -->
+  <div id="hit-pop-layer" class="hit-pop-layer"></div>
+
   <!-- Top HUD -->
   <div id="hud" class="hud hidden">
     <div class="hud-top-left">
@@ -34,6 +37,18 @@
       <div id="quest-title" class="quest-title">Büfeyi işlet ve müşterileri karşıla</div>
       <div id="quest-sub" class="quest-sub">Gelen müşterilere kulak ver, stokları takip et.</div>
     </div>
+
+    <div id="npc-hp-wrap" class="npc-hp-wrap hidden">
+      <div class="npc-hp-head">
+        <span id="npc-hp-name" class="npc-hp-name">SOFRABEZİ SABOTAJCISI</span>
+        <span id="npc-hp-count" class="npc-hp-count">5/5</span>
+      </div>
+      <div class="npc-hp-track">
+        <div id="npc-hp-fill" class="npc-hp-fill"></div>
+      </div>
+    </div>
+
+    <div id="sprint-pill" class="sprint-pill hidden">⚡ HIZLI KOŞ</div>
 
     <div class="hud-top-right">
       <button id="btn-sound" class="icon-btn" title="Sesi Aç/Kapat" aria-label="Sesi Aç/Kapat">🔊</button>
@@ -105,7 +120,7 @@
       <h1 class="start-title">EMİN BÜFE SİMÜLATÖRÜ</h1>
       <p class="start-desc">
         Modern Tokat Terminali'nin kalbindeki gerçek <strong>Z13 Emin Büfe</strong> tezgâhının başına geç.
-        Dolapları doldur, sofra bezlerine sahip çık, efsane Wi-Fi şifresini ver — gerekirse sopayı kap!
+        Dolapları doldur, sofra bezlerine sahip çık, çaktırmadan süzülen hırsızları yakalayıp patakla!
       </p>
       <div id="controls-guide" class="controls-guide"></div>
       <button id="btn-start" class="btn-start" disabled>Dokular Hazırlanıyor...</button>

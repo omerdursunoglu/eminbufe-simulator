@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const _camForward = new THREE.Vector3();
 const _camRight = new THREE.Vector3();
@@ -10,8 +11,8 @@ export class Engine {
     this.antialiasEnabled = !isMobile;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xdbe4ee);
-    this.scene.fog = new THREE.Fog(0xdbe4ee, 28, 72);
+    this.scene.background = new THREE.Color(0xcbd7e6);
+    this.scene.fog = new THREE.Fog(0xcbd7e6, 30, 78);
 
     this.camera = new THREE.PerspectiveCamera(
       68,
@@ -30,7 +31,7 @@ export class Engine {
     this.shakeTime = 0;
 
     this.renderer = this._createRenderer(canvas, this.antialiasEnabled);
-    this._setupLighting();
+    this._setupEnvironmentAndLighting();
 
     this._onResize = this.resize.bind(this);
     window.addEventListener('resize', this._onResize);
@@ -48,18 +49,27 @@ export class Engine {
     renderer.setSize(window.innerWidth, window.innerHeight, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.12;
+    renderer.toneMappingExposure = 1.08;
     renderer.shadowMap.enabled = false;
     return renderer;
   }
 
-  _setupLighting() {
+  _setupEnvironmentAndLighting() {
+    // Procedural studio environment map baked once at boot for realistic metal, marble & glass sheen
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const envScene = new RoomEnvironment();
+    this._envRT = pmrem.fromScene(envScene, 0.04);
+    this.scene.environment = this._envRT.texture;
+    this.scene.environmentIntensity = this.isMobile ? 0.42 : 0.58;
+    envScene.dispose();
+    pmrem.dispose();
+
     // Hard budget: strictly 1 HemisphereLight + 1 DirectionalLight, zero shadow maps
-    const hemi = new THREE.HemisphereLight(0xffffff, 0xc2bcb2, 1.58);
+    const hemi = new THREE.HemisphereLight(0xf8fbff, 0xa89f94, 1.15);
     this.scene.add(hemi);
 
-    const dir = new THREE.DirectionalLight(0xfff8ed, 0.92);
-    dir.position.set(6, 18, 16);
+    const dir = new THREE.DirectionalLight(0xfff5e4, 1.1);
+    dir.position.set(7, 18, 17);
     this.scene.add(dir);
   }
 
@@ -71,6 +81,14 @@ export class Engine {
     this.renderer.dispose();
     this.canvas = newCanvas;
     this.renderer = this._createRenderer(newCanvas, this.antialiasEnabled);
+    // Re-bake environment for new WebGL context
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    const envScene = new RoomEnvironment();
+    this._envRT?.dispose();
+    this._envRT = pmrem.fromScene(envScene, 0.04);
+    this.scene.environment = this._envRT.texture;
+    envScene.dispose();
+    pmrem.dispose();
     return this.antialiasEnabled;
   }
 
@@ -127,9 +145,6 @@ export class Engine {
     this.camera.rotation.z = shakeRoll;
   }
 
-  /**
-   * Returns pre-allocated horizontal forward direction (zero GC).
-   */
   getHorizontalForward(out) {
     out.set(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)).normalize();
     return out;

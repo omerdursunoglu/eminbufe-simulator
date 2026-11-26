@@ -140,6 +140,65 @@ body {
   margin-top: 2px;
 }
 
+/* Target Saboteur Health Bar */
+.npc-hp-wrap {
+  position: absolute;
+  top: max(86px, calc(env(safe-area-inset-top) + 74px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(320px, 68vw);
+  background: rgba(35, 10, 14, 0.88);
+  border: 1px solid rgba(239, 68, 68, 0.72);
+  backdrop-filter: blur(8px);
+  border-radius: 10px;
+  padding: 7px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.npc-hp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #fecaca;
+  margin-bottom: 5px;
+}
+
+.npc-hp-track {
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.npc-hp-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #dc2626, #f59e0b);
+  border-radius: 999px;
+  transition: width 0.14s ease-out;
+}
+
+/* Sprint active indicator */
+.sprint-pill {
+  position: fixed;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(6, 78, 59, 0.88);
+  border: 1px solid rgba(52, 211, 153, 0.75);
+  color: #ecfdf5;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
 .hud-top-right {
   position: absolute;
   top: max(12px, env(safe-area-inset-top));
@@ -205,6 +264,64 @@ body {
   background: rgba(15, 23, 42, 0.45);
   pointer-events: none;
   z-index: 22;
+  transition: transform 0.1s ease, border-color 0.1s ease, background 0.1s ease;
+}
+
+.crosshair.hot {
+  transform: translate(-50%, -50%) scale(1.65);
+  border-color: #ef4444;
+  background: rgba(245, 158, 11, 0.85);
+}
+
+/* Comic impact popups ("ÇAT!", "ÇUT!", "NAKAVT!") */
+.hit-pop-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 28;
+  overflow: hidden;
+}
+
+.hit-pop {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 28px;
+  font-weight: 900;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  color: #fde047;
+  text-shadow:
+    -2px -2px 0 #111827,
+    2px -2px 0 #111827,
+    -2px 2px 0 #111827,
+    2px 2px 0 #111827,
+    0 4px 14px rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+  will-change: transform, opacity;
+}
+
+.hit-pop.finisher {
+  font-size: 38px;
+  color: #f97316;
+}
+
+.hit-pop.active {
+  animation: hitPopBurst 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes hitPopBurst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.35) rotate(-8deg);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -82%) scale(1.28) rotate(4deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -145%) scale(0.95) rotate(-2deg);
+  }
 }
 
 .interact-prompt {
@@ -587,6 +704,11 @@ body {
     max-width: 92vw;
     width: 92vw;
     padding: 7px 12px;
+  }
+
+  .npc-hp-wrap {
+    top: calc(max(12px, env(safe-area-inset-top)) + 124px);
+    width: 86vw;
   }
 
   .stat-pill {

@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 
 /**
- * 100% Procedural Texture Generator (Zero JPEG photo dependencies).
- * Generates crisp vector signage atlas, traditional Tokat floral cloth patterns,
- * diegetic Wi-Fi note, animated departure board, porcelain floor tiles, and blob shadows.
+ * 100% Procedural High-Detail Vector & Material Texture Generator.
+ * Includes crisp signage, marble veining, POS monitor UI, porcelain tiles,
+ * traditional Tokat yazması floral fabric patterns, and diegetic Wi-Fi note.
  */
 export class TextureFactory {
   constructor() {
@@ -28,52 +28,55 @@ export class TextureFactory {
   }
 
   /**
-   * 4x2 grid (each cell 256x256 in a 1024x512 texture) for crisp brand & shop signs.
+   * 4x3 grid (each cell 256x256 in a 1024x768? Let's stick to power-of-two 1024x1024 4x4 grid!).
    */
   static getSignUV(index) {
     const col = index % 4;
     const row = Math.floor(index / 4);
-    const padU = 0.004;
-    const padV = 0.008;
-    const u0 = col * 0.25 + padU;
-    const u1 = (col + 1) * 0.25 - padU;
-    const v1 = 1.0 - row * 0.5 - padV;
-    const v0 = 1.0 - (row + 1) * 0.5 + padV;
+    const pad = 0.004;
+    const u0 = col * 0.25 + pad;
+    const u1 = (col + 1) * 0.25 - pad;
+    const v1 = 1.0 - row * 0.25 - pad;
+    const v0 = 1.0 - (row + 1) * 0.25 + pad;
     return { u0, v0, u1, v1 };
   }
 
   _buildSignAtlas() {
     const canvas = document.createElement('canvas');
     canvas.width = 1024;
-    canvas.height = 512;
+    canvas.height = 1024;
     const ctx = canvas.getContext('2d');
     const cell = 256;
     const pos = (idx) => [(idx % 4) * cell, Math.floor(idx / 4) * cell];
 
-    // 0: EMİN BÜFE main illuminated signboard
+    // 0: EMİN BÜFE Illuminated Fascia Sign
     {
       const [x, y] = pos(0);
       const grad = ctx.createLinearGradient(x, y, x + cell, y + cell);
-      grad.addColorStop(0, '#161920');
-      grad.addColorStop(1, '#272c38');
+      grad.addColorStop(0, '#12151d');
+      grad.addColorStop(1, '#262d3d');
       ctx.fillStyle = grad;
       ctx.fillRect(x, y, cell, cell);
       ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 8;
+      ctx.lineWidth = 7;
       ctx.strokeRect(x + 10, y + 12, cell - 20, cell - 24);
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.35)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x + 18, y + 20, cell - 36, cell - 40);
+
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
       ctx.font = '900 40px sans-serif';
-      ctx.fillText('EMİN BÜFE', x + 128, y + 112);
+      ctx.fillText('EMİN BÜFE', x + 128, y + 110);
       ctx.fillStyle = '#fbbf24';
       ctx.font = 'bold 17px sans-serif';
-      ctx.fillText('TOKAT TERMİNALİ • Z13', x + 128, y + 152);
+      ctx.fillText('TOKAT TERMİNALİ • Z13', x + 128, y + 150);
       ctx.fillStyle = '#cbd5e1';
       ctx.font = '700 13px sans-serif';
-      ctx.fillText('GIDA • SOFRA BEZİ • HEDİYELİK', x + 128, y + 190);
+      ctx.fillText('GIDA • SOFRA BEZİ • HEDİYELİK', x + 128, y + 188);
     }
 
-    // 1: Didi Soğuk Çay fridge header
+    // 1: Didi Soğuk Çay Fridge Header
     {
       const [x, y] = pos(1);
       const grad = ctx.createLinearGradient(x, y, x, y + cell);
@@ -83,8 +86,8 @@ export class TextureFactory {
       ctx.fillRect(x, y, cell, cell);
       ctx.fillStyle = 'rgba(255,255,255,0.22)';
       ctx.beginPath();
-      ctx.arc(x + 48, y + 188, 36, 0, Math.PI * 2);
-      ctx.arc(x + 210, y + 178, 42, 0, Math.PI * 2);
+      ctx.arc(x + 48, y + 190, 36, 0, Math.PI * 2);
+      ctx.arc(x + 210, y + 180, 42, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = '#ffffff';
       ctx.font = '900 72px sans-serif';
@@ -94,12 +97,11 @@ export class TextureFactory {
       ctx.fillText('SOĞUK ÇAY', x + 128, y + 180);
     }
 
-    // 2: Pepsi fridge header
+    // 2: Pepsi Fridge Header
     {
       const [x, y] = pos(2);
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(x, y, cell, cell);
-      // Red/White/Blue circle globe
       ctx.fillStyle = '#dc2626';
       ctx.beginPath();
       ctx.arc(x + 62, y + 128, 36, Math.PI, 0);
@@ -116,7 +118,7 @@ export class TextureFactory {
       ctx.textAlign = 'center';
     }
 
-    // 3: Patos red chips header
+    // 3: Patos Header
     {
       const [x, y] = pos(3);
       ctx.fillStyle = '#b91c1c';
@@ -133,10 +135,9 @@ export class TextureFactory {
       ctx.fillText('ÇITIR LEZZETLER', x + 128, y + 178);
     }
 
-    // 4: Z13 Blue Door Plaque + Yupo header split
+    // 4: Z13 Plaque (top) + Yupo Header (bottom)
     {
       const [x, y] = pos(4);
-      // Top half: Z13 plaque
       ctx.fillStyle = '#1d4ed8';
       ctx.fillRect(x, y, cell, 128);
       ctx.strokeStyle = '#ffffff';
@@ -145,7 +146,7 @@ export class TextureFactory {
       ctx.fillStyle = '#ffffff';
       ctx.font = '900 66px sans-serif';
       ctx.fillText('Z13', x + 128, y + 86);
-      // Bottom half: Yupo candy yellow header
+
       ctx.fillStyle = '#facc15';
       ctx.fillRect(x, y + 128, cell, 128);
       ctx.fillStyle = '#dc2626';
@@ -153,7 +154,7 @@ export class TextureFactory {
       ctx.fillText('YUPO', x + 128, y + 214);
     }
 
-    // 5: PUSULA stand graphic
+    // 5: PUSULA Stand Header
     {
       const [x, y] = pos(5);
       ctx.fillStyle = '#f8fafc';
@@ -169,7 +170,7 @@ export class TextureFactory {
       ctx.fillText('TOKAT ÖZEL', x + 128, y + 172);
     }
 
-    // 6: Taped Wall Price List (Vitrine/Kasa Wall)
+    // 6: Taped Wall Price List
     {
       const [x, y] = pos(6);
       ctx.fillStyle = '#f8fafc';
@@ -201,10 +202,9 @@ export class TextureFactory {
       ctx.textAlign = 'center';
     }
 
-    // 7: Photocopier Price Note ("Fotokopi 10 TL / Bilgisayar Çıktı 20 TL") + Teno Logo
+    // 7: Photocopier Price Note (top) + TENO Carton Logo (bottom)
     {
       const [x, y] = pos(7);
-      // Top half: Copier paper note
       ctx.fillStyle = '#fffef7';
       ctx.fillRect(x, y, cell, 128);
       ctx.strokeStyle = '#334155';
@@ -214,12 +214,93 @@ export class TextureFactory {
       ctx.font = 'bold 26px sans-serif';
       ctx.fillText('Fotokopi : 10 ₺', x + 128, y + 54);
       ctx.fillText('Bilg. Çıktı : 20 ₺', x + 128, y + 96);
-      // Bottom half: TENO cardboard print
+
       ctx.fillStyle = '#b48a5a';
       ctx.fillRect(x, y + 128, cell, 128);
       ctx.fillStyle = '#1e3a8a';
       ctx.font = '900 54px sans-serif';
       ctx.fillText('Teno', x + 128, y + 206);
+    }
+
+    // 8: Cashier POS Monitor UI Screen
+    {
+      const [x, y] = pos(8);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(x, y, cell, cell);
+      ctx.fillStyle = '#1e3a8a';
+      ctx.fillRect(x + 8, y + 10, cell - 16, 44);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText('EMİN BÜFE POS v2.6', x + 128, y + 39);
+      ctx.fillStyle = '#10b981';
+      ctx.fillRect(x + 14, y + 66, cell - 28, 74);
+      ctx.fillStyle = '#064e3b';
+      ctx.font = '900 32px monospace';
+      ctx.fillText('KASA HAZIR', x + 128, y + 114);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(x + 14, y + 154, 108, 84);
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(x + 134, y + 154, 108, 84);
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillText('NAKİT', x + 68, y + 202);
+      ctx.fillText('KART', x + 188, y + 202);
+    }
+
+    // 9: Dark Veined Emperador Marble (Exterior Columns!)
+    {
+      const [x, y] = pos(9);
+      ctx.fillStyle = '#231f20';
+      ctx.fillRect(x, y, cell, cell);
+      ctx.strokeStyle = 'rgba(226, 214, 195, 0.42)';
+      ctx.lineWidth = 2.5;
+      for (let v = 0; v < 9; v++) {
+        ctx.beginPath();
+        ctx.moveTo(x + (v * 33) % 256, y);
+        ctx.bezierCurveTo(
+          x + ((v * 67 + 40) % 256),
+          y + 85,
+          x + ((v * 91 + 120) % 256),
+          y + 170,
+          x + ((v * 47 + 200) % 256),
+          y + 256
+        );
+        ctx.stroke();
+      }
+    }
+
+    // 10: White Calacatta Veined Marble (Kasa & Vitrine Countertops!)
+    {
+      const [x, y] = pos(10);
+      ctx.fillStyle = '#f3f5f8';
+      ctx.fillRect(x, y, cell, cell);
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.42)';
+      ctx.lineWidth = 2;
+      for (let v = 0; v < 7; v++) {
+        ctx.beginPath();
+        ctx.moveTo(x, y + v * 38);
+        ctx.bezierCurveTo(x + 85, y + v * 38 + 22, x + 170, y + v * 38 - 18, x + 256, y + v * 38 + 14);
+        ctx.stroke();
+      }
+    }
+
+    // 11: Turkish Flag Plaque & Nazar Magnet Accent
+    {
+      const [x, y] = pos(11);
+      ctx.fillStyle = '#dc2626';
+      ctx.fillRect(x, y, cell, cell);
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(x + 112, y + 128, 54, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.arc(x + 126, y + 128, 43, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(x + 178, y + 128, 16, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     ctx.textAlign = 'left';
@@ -233,17 +314,26 @@ export class TextureFactory {
   }
 
   _buildClothAtlas() {
-    // 100% Procedural Tokat Yazması & Sofra Bezi floral patterns (with gold coin/pul oyalı borders!)
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 512;
     const ctx = canvas.getContext('2d');
 
-    const baseBg = '#311238'; // Rich plum/eggplant yazma backdrop
-    ctx.fillStyle = baseBg;
+    ctx.fillStyle = '#311238';
     ctx.fillRect(0, 0, 512, 512);
 
-    // Traditional block-print floral motifs across the fabric
+    // Subtle linen weave texture
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 512; i += 6) {
+      ctx.beginPath();
+      ctx.moveTo(i, 0);
+      ctx.lineTo(i, 512);
+      ctx.moveTo(0, i);
+      ctx.lineTo(512, i);
+      ctx.stroke();
+    }
+
     const drawFlower = (cx, cy, r) => {
       const petals = ['#ef4444', '#facc15', '#38bdf8', '#f8fafc', '#22c55e'];
       for (let p = 0; p < 6; p++) {
@@ -262,7 +352,6 @@ export class TextureFactory {
     for (let gx = 48; gx < 512; gx += 96) {
       for (let gy = 48; gy < 512; gy += 96) {
         drawFlower(gx, gy, 30);
-        // Connecting leaf vines
         ctx.strokeStyle = '#4ade80';
         ctx.lineWidth = 4;
         ctx.beginPath();
@@ -272,9 +361,9 @@ export class TextureFactory {
       }
     }
 
-    // Gold coin / pul (oya) border along the 4 edges!
+    // Gold coin / pul (oya) borders
     ctx.fillStyle = '#facc15';
-    for (let i = 16; i < 512; i += 24) {
+    for (let i = 16; i < 512; i += 22) {
       ctx.beginPath();
       ctx.arc(i, 12, 7, 0, Math.PI * 2);
       ctx.arc(i, 500, 7, 0, Math.PI * 2);
@@ -309,8 +398,7 @@ export class TextureFactory {
       ctx.stroke();
     }
 
-    // Masking tape strips
-    ctx.fillStyle = 'rgba(245, 222, 160, 0.88)';
+    ctx.fillStyle = 'rgba(245, 222, 160, 0.9)';
     ctx.save();
     ctx.translate(78, 36);
     ctx.rotate(-0.26);
@@ -343,7 +431,7 @@ export class TextureFactory {
 
     ctx.fillStyle = '#64748b';
     ctx.font = 'bold 20px sans-serif';
-    ctx.fillText('(Kasiyer Notu)', 256, 466);
+    ctx.fillText('(Sadece Kasiyer Görür)', 256, 466);
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -440,17 +528,24 @@ export class TextureFactory {
     canvas.height = 512;
     const ctx = canvas.getContext('2d');
 
-    ctx.fillStyle = '#cfd5dd';
+    ctx.fillStyle = '#cfd5de';
     ctx.fillRect(0, 0, 512, 512);
 
     for (let gx = 0; gx < 4; gx++) {
       for (let gy = 0; gy < 4; gy++) {
-        ctx.fillStyle = (gx + gy) % 2 === 0 ? '#d8dde4' : '#ced4dc';
-        ctx.fillRect(gx * 128 + 3, gy * 128 + 3, 122, 122);
+        ctx.fillStyle = (gx + gy) % 2 === 0 ? '#dce1e8' : '#d2d8e0';
+        ctx.fillRect(gx * 128 + 2, gy * 128 + 2, 124, 124);
+        // Subtle porcelain marbling
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(gx * 128 + 14, gy * 128 + 24);
+        ctx.lineTo(gx * 128 + 112, gy * 128 + 98);
+        ctx.stroke();
       }
     }
 
-    ctx.strokeStyle = 'rgba(100, 116, 139, 0.35)';
+    ctx.strokeStyle = 'rgba(100, 116, 139, 0.42)';
     ctx.lineWidth = 3;
     for (let i = 0; i <= 4; i++) {
       const p = i * 128;

@@ -20,6 +20,13 @@ export class StoryEvents {
     this.eventQueue = ['icecream', 'wifi', 'sofra'];
     this.nextEventTimer = 7.5;
     this.shiftCompleteShown = false;
+    this.stickHideTimer = 0;
+    this.hitToasts = [
+      'PAT! — Sabotajcı: "AH! Dur usta elim kaydı!"',
+      'KÜT! — Sabotajcı: "OF! Vallahi bir daha dağıtmam!"',
+      'BAM! — Sabotajcı: "ABİ YETER BELİM KIRILDI!"',
+      'GÜM! — Sabotajcı: "TAMAM TESLİM OLUYORUM VURMA!"'
+    ];
 
     // Start fridges slightly used (34/48 ≈ 71%) so stock depletion engages cleanly during play
     this.bufe.consumeDrink(14);
@@ -100,6 +107,15 @@ export class StoryEvents {
           false
         );
         break;
+      case QuestState.EVENT_SOFRABEZI_CHASE: {
+        const s = this.npcs.storyNpc;
+        this.ui.setQuest(
+          `Sofra Bezini Dağıtanı Sopayla Döv! (${s.hp}/${s.maxHp} Can)`,
+          'Shift / KOŞ ile hızlı koş, yaklaşıp Sol Tık / E ile sopayı indir!',
+          true
+        );
+        break;
+      }
       case QuestState.EVENT_SOFRABEZI_CLEANUP:
         this.ui.setQuest(
           `Dağılan Sofra Bezlerini Topla ve Düzenle (${this.bufe.clothsCollected}/${this.bufe.clothCount})`,
@@ -144,11 +160,81 @@ export class StoryEvents {
 
   onSabotageScattered() {
     this.bufe.scatterSofraCloths();
-    this.qsm.transition(QuestState.EVENT_SOFRABEZI_CLEANUP);
+    this.qsm.transition(QuestState.EVENT_SOFRABEZI_CHASE);
+    this.stickHideTimer = 0;
+    this.viewmodel.setActive(true);
+    this.engine.setShake(0.011);
     this.sound.playRageSting();
+    this.sound.startChaseMusic();
+    this.npcs.startSofraChase();
     this.ui.triggerRageVignette(2400);
-    this.ui.showToast('Yine dağıttı gitti, sabır ya!', 3800, true);
+    this.ui.setNpcHealth(
+      true,
+      'SOFRABEZİ SABOTAJCISI',
+      this.npcs.storyNpc.hp,
+      this.npcs.storyNpc.maxHp
+    );
+    this.ui.showToast(
+      'Yine dağıttı gitti, sabır ya! Hızlı Koş (Shift/KOŞ) ile kovala, sopayla döv!',
+      4400,
+      true
+    );
     this._syncQuestHud();
+  }
+
+  onSofraTaunt() {
+    if (this.qsm.state !== QuestState.EVENT_SOFRABEZI_CHASE) return;
+    this.ui.showToast(
+      'Sabotajcı: "Hızlı koşsan bile yakalayamazsın haha!" (Shift / KOŞ bas!)',
+      3200,
+      true
+    );
+  }
+
+  onStickSwing(playerPos, lookForward) {
+    if (!this.viewmodel.canSwing()) return;
+    this.viewmodel.triggerSwing();
+    this.sound.playStickSwing();
+
+    const res = this.npcs.tryHitStoryNpc(playerPos, lookForward, 2.65);
+    if (!res.hit) return;
+
+    this.viewmodel.triggerHitBounce();
+    this.engine.pulseHitShake(res.knockedOut ? 0.068 : 0.044);
+
+    if (res.type === 'sofra') {
+      this.ui.setNpcHealth(true, 'SOFRABEZİ SABOTAJCISI', res.hp, res.maxHp);
+      if (res.knockedOut) {
+        this.sound.playKnockout();
+        this.sound.stopChaseMusic();
+        this.engine.setShake(0);
+        this.stickHideTimer = 0.42;
+        this.qsm.cash += 100;
+        this.sound.playCashRegister();
+        this.qsm.transition(QuestState.EVENT_SOFRABEZI_CLEANUP);
+        this.ui.setNpcHealth(false);
+        this.ui.showToast(
+          'TAM İSABET! Sabotajcıyı sopayla benzettin (+100 ₺)! Şimdi sofra bezlerini topla!',
+          4600
+        );
+        this._syncHudStats();
+        this._syncQuestHud();
+      } else {
+        this.sound.playStickHit(res.hitCount);
+        const msg = this.hitToasts[(res.hitCount - 1) % this.hitToasts.length];
+        this.ui.showToast(msg, 2400, true);
+        this._syncQuestHud();
+      }
+    } else if (res.type === 'icecream') {
+      this.sound.playStickHit(res.hitCount);
+      if (res.hitCount === 1) {
+        this.qsm.cash += 20;
+        this._syncHudStats();
+        this.ui.showToast('PAT! Müşteri: "ANAM VURMA ABİ KAÇIYORUM!" (+20 ₺)', 2400);
+      } else {
+        this.ui.showToast('KÜT! Müşteri: "KOŞUYORUM İŞTE ABİ!"', 1800);
+      }
+    }
   }
 
   onChaseEscapedExit() {
@@ -338,6 +424,19 @@ export class StoryEvents {
   }
 
   update(dt, target, interactHeld) {
+    if (this.stickHideTimer > 0) {
+      this.stickHideTimer -= dt;
+      if (this.stickHideTimer <= 0) {
+        this.stickHideTimer = 0;
+        if (
+          this.qsm.state !== QuestState.EVENT_ICECREAM_CHASE &&
+          this.qsm.state !== QuestState.EVENT_SOFRABEZI_CHASE
+        ) {
+          this.viewmodel.setActive(false);
+        }
+      }
+    }
+
     // Handle fridge hold-to-restock progress bar
     if (target.type === 'fridge' && this.qsm.carryingCrate && interactHeld) {
       if (this.qsm.restockProgress === 0) {

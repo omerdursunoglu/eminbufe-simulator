@@ -39,7 +39,7 @@ async function bootstrap() {
   const viewmodel = new ViewmodelStick(engine.camera);
 
   const npcFactory = new NpcFactory(engine.scene, textures, 6);
-  const npcManager = new NpcManager(npcFactory, bufe, sound);
+  const npcManager = new NpcManager(npcFactory, bufe, sound, colliders);
 
   const qsm = new QuestStateMachine();
   const story = new StoryEvents(qsm, bufe, npcManager, viewmodel, engine, ui, input, sound);
@@ -138,7 +138,7 @@ async function bootstrap() {
       if (mag > 0.05) {
         const clampedMag = Math.min(1, mag);
         moveRatio = clampedMag;
-        const speed = input.sprint ? 7.9 : 4.5;
+        const speed = input.sprint ? 8.3 : 4.5;
         engine.getHorizontalForward(_forward);
         engine.getHorizontalRight(_right);
 
@@ -152,24 +152,42 @@ async function bootstrap() {
     }
 
     engine.applyCamera(playerPos.x, playerPos.z, dt, moveRatio, input.sprint);
-    viewmodel.update(dt, moveRatio);
+    viewmodel.update(dt, moveRatio, input.sprint);
     sound.update(dt, moveRatio > 0.1, input.sprint);
+    ui.setSprintIndicator(input.sprint && moveRatio > 0.1 && !input.dialogueOpen);
 
     // NPCs & Quest State Machine
     npcManager.update(dt, playerPos, {
       onStoryNpcArrived: (t) => story.onStoryNpcArrived(t),
       onSabotageStart: () => story.onSabotageStart(),
       onSabotageScattered: () => story.onSabotageScattered(),
+      onSofraTaunt: () => story.onSofraTaunt(),
       onChaseEscapedExit: () => story.onChaseEscapedExit()
     });
 
     engine.getCameraForward(_lookForward);
     const target = interactables.findNearest(playerPos, _lookForward, npcManager, qsm);
+    const isChase =
+      qsm.state === QuestState.EVENT_ICECREAM_CHASE ||
+      qsm.state === QuestState.EVENT_SOFRABEZI_CHASE;
+    const inHitRange = isChase && npcManager.isStoryNpcInHitRange(playerPos, _lookForward, 2.65);
+    ui.setCrosshairHot(inHitRange);
 
     if (input.dialogueOpen) {
       ui.setInteractPrompt(false);
-    } else if (qsm.state === QuestState.EVENT_ICECREAM_CHASE) {
-      ui.setInteractPrompt(true, 'Sopa Salla!', input.effectiveMobile(), 'Tık/E');
+    } else if (isChase) {
+      if (inHitRange) {
+        ui.setInteractPrompt(true, 'SOPAYLA VUR!', input.effectiveMobile(), 'Tık/E');
+      } else if (qsm.state === QuestState.EVENT_SOFRABEZI_CHASE) {
+        ui.setInteractPrompt(
+          true,
+          input.sprint ? 'Yaklaş & Vur!' : 'Koş & Yakala!',
+          input.effectiveMobile(),
+          input.sprint ? 'Tık/E' : 'Shift+Tık'
+        );
+      } else {
+        ui.setInteractPrompt(true, 'Sopa Salla!', input.effectiveMobile(), 'Tık/E');
+      }
     } else if (target.type !== 'none') {
       ui.setInteractPrompt(true, target.label, input.effectiveMobile(), target.keyLabel);
     } else {
@@ -177,9 +195,8 @@ async function bootstrap() {
     }
 
     if (input.consumeInteractPress() && !input.dialogueOpen) {
-      if (qsm.state === QuestState.EVENT_ICECREAM_CHASE) {
-        viewmodel.triggerSwing();
-        sound.playStickSwing();
+      if (isChase) {
+        story.onStickSwing(playerPos, _lookForward);
       } else {
         story.handleInteraction(target);
       }

@@ -236,6 +236,82 @@ export class SoundEngine {
     osc.stop(now + 0.16);
   }
 
+  playStickHit(combo = 1) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+
+    // 1. Punchy wooden body thud
+    const thud = this.ctx.createOscillator();
+    const tGain = this.ctx.createGain();
+    thud.type = 'triangle';
+    thud.frequency.setValueAtTime(175, now);
+    thud.frequency.exponentialRampToValueAtTime(48, now + 0.12);
+    tGain.gain.setValueAtTime(0.32, now);
+    tGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    thud.connect(tGain);
+    tGain.connect(this.master);
+    thud.start(now);
+    thud.stop(now + 0.15);
+
+    // 2. Sharp wooden slap crack
+    const crack = this.ctx.createOscillator();
+    const cGain = this.ctx.createGain();
+    crack.type = 'square';
+    crack.frequency.setValueAtTime(520, now);
+    crack.frequency.exponentialRampToValueAtTime(135, now + 0.065);
+    cGain.gain.setValueAtTime(0.18, now);
+    cGain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+    crack.connect(cGain);
+    cGain.connect(this.master);
+    crack.start(now);
+    crack.stop(now + 0.08);
+
+    // 3. Comical rising "BOINK/OUCH" tone
+    const yelp = this.ctx.createOscillator();
+    const yGain = this.ctx.createGain();
+    yelp.type = 'sine';
+    const base = 360 + Math.min(5, combo) * 48;
+    yelp.frequency.setValueAtTime(base, now + 0.02);
+    yelp.frequency.exponentialRampToValueAtTime(base * 0.62, now + 0.14);
+    yGain.gain.setValueAtTime(0.16, now + 0.02);
+    yGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+    yelp.connect(yGain);
+    yGain.connect(this.master);
+    yelp.start(now + 0.02);
+    yelp.stop(now + 0.17);
+  }
+
+  playKnockout() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+
+    // Heavy KO thwack
+    const thud = this.ctx.createOscillator();
+    const tGain = this.ctx.createGain();
+    thud.type = 'triangle';
+    thud.frequency.setValueAtTime(210, now);
+    thud.frequency.exponentialRampToValueAtTime(36, now + 0.24);
+    tGain.gain.setValueAtTime(0.36, now);
+    tGain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+    thud.connect(tGain);
+    tGain.connect(this.master);
+    thud.start(now);
+    thud.stop(now + 0.28);
+
+    // Descending cartoon dizzy slide
+    const slide = this.ctx.createOscillator();
+    const sGain = this.ctx.createGain();
+    slide.type = 'sine';
+    slide.frequency.setValueAtTime(680, now + 0.05);
+    slide.frequency.exponentialRampToValueAtTime(140, now + 0.45);
+    sGain.gain.setValueAtTime(0.18, now + 0.05);
+    sGain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+    slide.connect(sGain);
+    sGain.connect(this.master);
+    slide.start(now + 0.05);
+    slide.stop(now + 0.5);
+  }
+
   playRageSting() {
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
@@ -328,5 +404,100 @@ export class SoundEngine {
       clearInterval(this._chaseTimer);
       this._chaseTimer = null;
     }
+  }
+
+  playPunchHit(comboIdx = 0, isFinisher = false) {
+    if (!this.ctx || this.muted) return;
+    const now = this.ctx.currentTime;
+
+    // 1. Crisp "ÇAT / ÇUT" slap transient (short bandpass noise burst)
+    const dur = isFinisher ? 0.14 : 0.085;
+    const bufLen = Math.floor(this.ctx.sampleRate * dur);
+    const buf = this.ctx.createBuffer(1, bufLen, this.ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen * 0.28));
+    }
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = buf;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = isFinisher ? 950 : comboIdx % 2 === 0 ? 1550 : 1120;
+    filter.Q.value = 1.4;
+
+    const nGain = this.ctx.createGain();
+    nGain.gain.setValueAtTime(isFinisher ? 0.52 : 0.36, now);
+    nGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+    noise.connect(filter);
+    filter.connect(nGain);
+    nGain.connect(this.master);
+    noise.start(now);
+
+    // 2. Heavy "KÜT" body punch thump
+    const thump = this.ctx.createOscillator();
+    const tGain = this.ctx.createGain();
+    thump.type = isFinisher ? 'sawtooth' : 'triangle';
+    const startFreq = isFinisher ? 150 : comboIdx % 2 === 0 ? 195 : 165;
+    thump.frequency.setValueAtTime(startFreq, now);
+    thump.frequency.exponentialRampToValueAtTime(isFinisher ? 34 : 46, now + (isFinisher ? 0.24 : 0.11));
+    tGain.gain.setValueAtTime(isFinisher ? 0.42 : 0.26, now);
+    tGain.gain.exponentialRampToValueAtTime(0.001, now + (isFinisher ? 0.26 : 0.12));
+    thump.connect(tGain);
+    tGain.connect(this.master);
+    thump.start(now);
+    thump.stop(now + (isFinisher ? 0.28 : 0.13));
+
+    // 3. Finisher floor slam + comic star ring
+    if (isFinisher) {
+      const slamT = now + 0.16;
+      const slam = this.ctx.createOscillator();
+      const sGain = this.ctx.createGain();
+      slam.type = 'sine';
+      slam.frequency.setValueAtTime(95, slamT);
+      slam.frequency.exponentialRampToValueAtTime(28, slamT + 0.22);
+      sGain.gain.setValueAtTime(0.32, slamT);
+      sGain.gain.exponentialRampToValueAtTime(0.001, slamT + 0.24);
+      slam.connect(sGain);
+      sGain.connect(this.master);
+      slam.start(slamT);
+      slam.stop(slamT + 0.25);
+    }
+  }
+
+  playThiefSpotted() {
+    if (!this.ctx || this.muted) return;
+    const now = this.ctx.currentTime;
+    const notes = [330, 293.66, 246.94];
+    for (let i = 0; i < notes.length; i++) {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      const t = now + i * 0.09;
+      osc.frequency.setValueAtTime(notes[i], t);
+      gain.gain.setValueAtTime(0.09, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.1);
+    }
+  }
+
+  playThiefStole() {
+    if (!this.ctx || this.muted) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(420, now);
+    osc.frequency.exponentialRampToValueAtTime(175, now + 0.24);
+    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+    osc.connect(gain);
+    gain.connect(this.master);
+    osc.start(now);
+    osc.stop(now + 0.27);
   }
 }

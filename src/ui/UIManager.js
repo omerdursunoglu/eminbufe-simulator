@@ -1,3 +1,7 @@
+import * as THREE from 'three';
+
+const _projVec = new THREE.Vector3();
+
 export class UIManager {
   constructor() {
     this.hud = document.getElementById('hud');
@@ -13,6 +17,12 @@ export class UIManager {
     this.questBox = document.getElementById('quest-box');
     this.questTitle = document.getElementById('quest-title');
     this.questSub = document.getElementById('quest-sub');
+
+    this.npcHpWrap = document.getElementById('npc-hp-wrap');
+    this.npcHpName = document.getElementById('npc-hp-name');
+    this.npcHpCount = document.getElementById('npc-hp-count');
+    this.npcHpFill = document.getElementById('npc-hp-fill');
+    this.sprintPill = document.getElementById('sprint-pill');
 
     this.crosshair = document.getElementById('crosshair');
     this.interactPrompt = document.getElementById('interact-prompt');
@@ -49,6 +59,19 @@ export class UIManager {
     this._toastTimer = null;
     this._rageTimer = null;
     this.debugOpen = false;
+
+    // Pre-allocated DOM pool of comic impact popups ("ÇAT!", "ÇUT!", "NAKAVT!")
+    this.hitPopLayer = document.getElementById('hit-pop-layer');
+    this._hitPops = [];
+    this._hitPopIndex = 0;
+    if (this.hitPopLayer) {
+      for (let i = 0; i < 6; i++) {
+        const el = document.createElement('div');
+        el.className = 'hit-pop hidden';
+        this.hitPopLayer.appendChild(el);
+        this._hitPops.push({ el, timer: null });
+      }
+    }
 
     this.btnDebugToggle.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -105,6 +128,24 @@ export class UIManager {
     this.questBox.classList.toggle('urgent', urgent);
   }
 
+  setNpcHealth(visible, name = 'SOFRABEZİ SABOTAJCISI', hp = 0, maxHp = 5) {
+    this.npcHpWrap.classList.toggle('hidden', !visible);
+    if (visible) {
+      this.npcHpName.textContent = name;
+      this.npcHpCount.textContent = `${hp}/${maxHp}`;
+      const pct = maxHp > 0 ? Math.max(0, Math.min(100, (hp / maxHp) * 100)) : 0;
+      this.npcHpFill.style.width = `${pct.toFixed(1)}%`;
+    }
+  }
+
+  setSprintIndicator(active) {
+    this.sprintPill.classList.toggle('hidden', !active);
+  }
+
+  setCrosshairHot(hot) {
+    this.crosshair.classList.toggle('hot', hot);
+  }
+
   setInteractPrompt(visible, text = '', isMobile = false, keyLabel = 'E') {
     if (!visible) {
       this.interactPrompt.classList.add('hidden');
@@ -145,9 +186,39 @@ export class UIManager {
     }, durationMs);
   }
 
+  spawnHitPopup(worldX, worldY, worldZ, camera, label, isFinisher = false) {
+    if (!this._hitPops.length) return;
+    const slot = this._hitPops[this._hitPopIndex];
+    this._hitPopIndex = (this._hitPopIndex + 1) % this._hitPops.length;
+    if (slot.timer) clearTimeout(slot.timer);
+
+    _projVec.set(worldX, worldY, worldZ).project(camera);
+    let sx = window.innerWidth * 0.5;
+    let sy = window.innerHeight * 0.44;
+    if (_projVec.z <= 1) {
+      sx = (_projVec.x * 0.5 + 0.5) * window.innerWidth + (Math.random() - 0.5) * 42;
+      sy = (-_projVec.y * 0.5 + 0.5) * window.innerHeight + (Math.random() - 0.5) * 24;
+    }
+    sx = Math.max(80, Math.min(window.innerWidth - 80, sx));
+    sy = Math.max(80, Math.min(window.innerHeight - 80, sy));
+
+    const el = slot.el;
+    el.textContent = label;
+    el.style.left = `${sx.toFixed(0)}px`;
+    el.style.top = `${sy.toFixed(0)}px`;
+    el.className = 'hit-pop' + (isFinisher ? ' finisher' : '');
+    void el.offsetWidth;
+    el.classList.add('active');
+    slot.timer = setTimeout(() => {
+      el.className = 'hit-pop hidden';
+    }, 650);
+  }
+
   openDialogue(speaker, badge, text, options, onChoose) {
     this.interactPrompt.classList.add('hidden');
     this.toastBox.classList.add('hidden');
+    this.sprintPill.classList.add('hidden');
+    this.crosshair.classList.remove('hot');
     this.dlgSpeaker.textContent = speaker;
     this.dlgBadge.textContent = badge;
     this.dlgText.textContent = text;
