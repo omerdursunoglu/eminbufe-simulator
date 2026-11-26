@@ -46,9 +46,10 @@ async function bootstrap() {
 
   npcManager.startRegularBuyerCycle(() => story.onRegularDrinkSold());
 
-  // Player spawns right at the Emin Bufe cashier desk, able to glimpse the Wi-Fi note & front hall
-  const playerPos = new THREE.Vector3(1.45, 0, -2.95);
-  engine.setLook(Math.PI * 1.07, -0.04);
+  // Player spawns right inside the accurate Kasa nook behind the pastry vitrine,
+  // facing diagonally out across the monitor, Sofra stand, Didi fridge, and terminal hall
+  const playerPos = new THREE.Vector3(0.76, 0, -2.92);
+  engine.setLook(-Math.PI * 0.78, -0.05);
   engine.applyCamera(playerPos.x, playerPos.z, 0, 0, false);
 
   let started = false;
@@ -68,7 +69,7 @@ async function bootstrap() {
     input.setActive(true);
     ui.showGameHUD(input.effectiveMobile());
     input.requestLockIfPC();
-    ui.showToast('Hoş geldin usta! Sağ tarafında kasa ve Wi-Fi notu, önde terminal!', 4200);
+    ui.showToast('Hoş geldin usta! Kasa başındasın — Wi-Fi notun duvar köşesinde, müşteriler önde!', 4200);
   });
 
   ui.btnToggleMode.addEventListener('click', () => {

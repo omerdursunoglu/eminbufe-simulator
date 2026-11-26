@@ -1,51 +1,13 @@
 import * as THREE from 'three';
 
-import imgInsideUrl from '../../gorseller/WhatsApp Image 2026-11-26 at 21.19.51.jpeg';
-import imgFacadeUrl from '../../gorseller/WhatsApp Image 2026-11-26 at 21.19.51 (1).jpeg';
-import imgSofraUrl from '../../gorseller/WhatsApp Image 2026-11-26 at 21.19.51 (2).jpeg';
-import imgCashierUrl from '../../gorseller/WhatsApp Image 2026-11-26 at 21.19.51 (3).jpeg';
-import imgLeftWallUrl from '../../gorseller/WhatsApp Image 2026-11-26 at 21.19.52.jpeg';
-
-function loadImage(url) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
-}
-
-function drawCroppedTile(ctx, img, sx, sy, sw, sh, tx, ty, tileSize, fallbackColor) {
-  ctx.save();
-  ctx.fillStyle = fallbackColor;
-  ctx.fillRect(tx, ty, tileSize, tileSize);
-  if (img && img.naturalWidth > 0) {
-    const iw = img.naturalWidth;
-    const ih = img.naturalHeight;
-    // Draw slightly padded border to prevent mipmap edge bleeding
-    ctx.drawImage(
-      img,
-      sx * iw,
-      sy * ih,
-      sw * iw,
-      sh * ih,
-      tx,
-      ty,
-      tileSize,
-      tileSize
-    );
-  }
-  ctx.restore();
-}
-
 /**
- * Loads all 5 reference photos from ./gorseller/, slices & downscales them into
- * <= 1024x1024 mipmapped CanvasTextures so total GPU memory and draw calls stay minimal.
+ * 100% Procedural Texture Generator (Zero JPEG photo dependencies).
+ * Generates crisp vector signage atlas, traditional Tokat floral cloth patterns,
+ * diegetic Wi-Fi note, animated departure board, porcelain floor tiles, and blob shadows.
  */
 export class TextureFactory {
   constructor() {
-    this.shopAtlas = null;
+    this.signAtlas = null;
     this.clothAtlas = null;
     this.wifiNoteTexture = null;
     this.departureTexture = null;
@@ -57,16 +19,8 @@ export class TextureFactory {
   }
 
   async init() {
-    const [imgInside, imgFacade, imgSofra, imgCashier, imgLeftWall] = await Promise.all([
-      loadImage(imgInsideUrl),
-      loadImage(imgFacadeUrl),
-      loadImage(imgSofraUrl),
-      loadImage(imgCashierUrl),
-      loadImage(imgLeftWallUrl)
-    ]);
-
-    this._buildShopAtlas({ imgInside, imgFacade, imgSofra, imgCashier, imgLeftWall });
-    this._buildClothAtlas(imgSofra);
+    this._buildSignAtlas();
+    this._buildClothAtlas();
     this._buildWifiNoteTexture();
     this._buildDepartureBoardTexture();
     this._buildFloorTileTexture();
@@ -74,205 +28,265 @@ export class TextureFactory {
   }
 
   /**
-   * 4x4 grid (each cell 256x256 in a 1024x1024 texture).
-   * Returns normalized UV rect [u0, v0, u1, v1] inset slightly to prevent mip bleeding.
+   * 4x2 grid (each cell 256x256 in a 1024x512 texture) for crisp brand & shop signs.
    */
-  static getAtlasUV(index) {
+  static getSignUV(index) {
     const col = index % 4;
     const row = Math.floor(index / 4);
-    // In Three.js CanvasTexture (flipY=true), row 0 (top of canvas) is v = [0.75..1.0]
-    const pad = 0.005;
-    const u0 = col * 0.25 + pad;
-    const u1 = (col + 1) * 0.25 - pad;
-    const v1 = 1.0 - row * 0.25 - pad;
-    const v0 = 1.0 - (row + 1) * 0.25 + pad;
+    const padU = 0.004;
+    const padV = 0.008;
+    const u0 = col * 0.25 + padU;
+    const u1 = (col + 1) * 0.25 - padU;
+    const v1 = 1.0 - row * 0.5 - padV;
+    const v0 = 1.0 - (row + 1) * 0.5 + padV;
     return { u0, v0, u1, v1 };
   }
 
-  _buildShopAtlas({ imgInside, imgFacade, imgSofra, imgCashier, imgLeftWall }) {
-    const size = 1024;
-    const cell = 256;
+  _buildSignAtlas() {
     const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
+    canvas.width = 1024;
+    canvas.height = 512;
     const ctx = canvas.getContext('2d');
+    const cell = 256;
+    const pos = (idx) => [(idx % 4) * cell, Math.floor(idx / 4) * cell];
 
-    const tilePos = (idx) => [(idx % 4) * cell, Math.floor(idx / 4) * cell];
-
-    // 0: Warm lit pastry & Zile pekmezi vitrine (from 21.19.51.jpeg)
+    // 0: EMİN BÜFE main illuminated signboard
     {
-      const [x, y] = tilePos(0);
-      drawCroppedTile(ctx, imgInside, 0.01, 0.56, 0.38, 0.35, x, y, cell, '#d4943a');
-    }
-    // 1: Didi blue fridge header + side magnet/souvenir panel (21.19.51.jpeg)
-    {
-      const [x, y] = tilePos(1);
-      drawCroppedTile(ctx, imgInside, 0.64, 0.34, 0.10, 0.42, x, y, cell, '#1565c0');
-    }
-    // 2: Didi top banner + red wire kuruyemis rack (top half Didi header, bottom half kuruyemis)
-    {
-      const [x, y] = tilePos(2);
-      drawCroppedTile(ctx, imgInside, 0.72, 0.32, 0.13, 0.08, x, y, cell, '#1565c0');
-    }
-    // 3: Red kuruyemis snack rack (21.19.51.jpeg)
-    {
-      const [x, y] = tilePos(3);
-      drawCroppedTile(ctx, imgInside, 0.84, 0.45, 0.15, 0.40, x, y, cell, '#a91e22');
-    }
-    // 4: Dark veined marble pillar (21.19.51 (1).jpeg)
-    {
-      const [x, y] = tilePos(4);
-      drawCroppedTile(ctx, imgFacade, 0.005, 0.14, 0.055, 0.65, x, y, cell, '#262121');
-    }
-    // 5: Red Patos & Yellow Yupo entrance snack stands (21.19.51 (1).jpeg)
-    {
-      const [x, y] = tilePos(5);
-      drawCroppedTile(ctx, imgFacade, 0.06, 0.28, 0.16, 0.46, x, y, cell, '#c62828');
-    }
-    // 6: Pepsi fridge top header + Pusula stand (top half Pepsi, bottom half Pusula)
-    {
-      const [x, y] = tilePos(6);
-      drawCroppedTile(ctx, imgFacade, 0.875, 0.315, 0.115, 0.065, x, y, cell, '#0c1f4a');
-    }
-    // 7: Eti Burcak / Nero / Gong biscuit shelves under sofra stand (21.19.51 (2).jpeg)
-    {
-      const [x, y] = tilePos(7);
-      drawCroppedTile(ctx, imgSofra, 0.24, 0.55, 0.52, 0.36, x, y, cell, '#e2e8f0');
-    }
-    // 8: Hanging Tesbih display board (21.19.51 (2).jpeg)
-    {
-      const [x, y] = tilePos(8);
-      drawCroppedTile(ctx, imgSofra, 0.75, 0.34, 0.14, 0.54, x, y, cell, '#d6cfc2');
-    }
-    // 9: Phone accessories pegboard (21.19.51 (3).jpeg)
-    {
-      const [x, y] = tilePos(9);
-      drawCroppedTile(ctx, imgCashier, 0.32, 0.04, 0.26, 0.44, x, y, cell, '#e8edf2');
-    }
-    // 10: Tokat souvenirs shelves with red/blue trim (21.19.51 (3).jpeg)
-    {
-      const [x, y] = tilePos(10);
-      drawCroppedTile(ctx, imgCashier, 0.57, 0.01, 0.42, 0.45, x, y, cell, '#cbd5e1');
-    }
-    // 11: Gum / lollipop / chocolate cashier display (21.19.51 (3).jpeg)
-    {
-      const [x, y] = tilePos(11);
-      drawCroppedTile(ctx, imgCashier, 0.33, 0.45, 0.50, 0.36, x, y, cell, '#f1f5f9');
-    }
-    // 12: Left wall blue/red shelves - toiletries & toys (21.19.52.jpeg)
-    {
-      const [x, y] = tilePos(12);
-      drawCroppedTile(ctx, imgLeftWall, 0.22, 0.05, 0.64, 0.60, x, y, cell, '#e2e8f0');
-    }
-    // 13: Glass jewelry vitrine + lokum/pekmez lower shelves (21.19.52.jpeg)
-    {
-      const [x, y] = tilePos(13);
-      drawCroppedTile(ctx, imgLeftWall, 0.0, 0.62, 0.54, 0.37, x, y, cell, '#cbd5e1');
-    }
-    // 14: Photocopier front + "Fotokopi 10 TL / Bilgisayar Çıktı 20 TL" + Price sheets
-    {
-      const [x, y] = tilePos(14);
-      drawCroppedTile(ctx, imgLeftWall, 0.56, 0.58, 0.26, 0.41, x, y, cell, '#dcd7cb');
-      // Crisp readable price badge accent
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(x + 92, y + 72, 74, 42);
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x + 92, y + 72, 74, 42);
-      ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText('Fotokopi: 10₺', x + 96, y + 89);
-      ctx.fillText('Çıktı: 20₺', x + 96, y + 106);
-    }
-    // 15: EMİN BÜFE Illuminated Signboard + Z13 Badge (21.19.51 (1).jpeg matching style)
-    {
-      const [x, y] = tilePos(15);
-      // Top 75%: Main Sign
+      const [x, y] = pos(0);
       const grad = ctx.createLinearGradient(x, y, x + cell, y + cell);
-      grad.addColorStop(0, '#181b22');
+      grad.addColorStop(0, '#161920');
       grad.addColorStop(1, '#272c38');
       ctx.fillStyle = grad;
       ctx.fillRect(x, y, cell, cell);
-
       ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 6;
-      ctx.strokeRect(x + 8, y + 8, cell - 16, 172);
-
+      ctx.lineWidth = 8;
+      ctx.strokeRect(x + 10, y + 12, cell - 20, cell - 24);
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
-      ctx.font = '900 38px sans-serif';
-      ctx.fillText('EMİN BÜFE', x + cell * 0.5, y + 86);
-
+      ctx.font = '900 40px sans-serif';
+      ctx.fillText('EMİN BÜFE', x + 128, y + 112);
       ctx.fillStyle = '#fbbf24';
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillText('TOKAT TERMİNALİ • Z13', x + cell * 0.5, y + 124);
-
+      ctx.font = 'bold 17px sans-serif';
+      ctx.fillText('TOKAT TERMİNALİ • Z13', x + 128, y + 152);
       ctx.fillStyle = '#cbd5e1';
-      ctx.font = '600 12px sans-serif';
-      ctx.fillText('GIDA • HEDİYELİK • SOFRA BEZİ', x + cell * 0.5, y + 152);
-
-      // Bottom 25%: Blue Z13 plaque + Pusula stripe
-      ctx.fillStyle = '#1d4ed8';
-      ctx.fillRect(x + 10, y + 190, 110, 56);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 30px sans-serif';
-      ctx.fillText('Z13', x + 65, y + 229);
-
-      ctx.fillStyle = '#f8fafc';
-      ctx.fillRect(x + 128, y + 190, 118, 56);
-      ctx.fillStyle = '#1e293b';
-      ctx.font = '900 22px sans-serif';
-      ctx.fillText('PUSULA', x + 187, y + 226);
-      ctx.textAlign = 'left';
+      ctx.font = '700 13px sans-serif';
+      ctx.fillText('GIDA • SOFRA BEZİ • HEDİYELİK', x + 128, y + 190);
     }
 
+    // 1: Didi Soğuk Çay fridge header
+    {
+      const [x, y] = pos(1);
+      const grad = ctx.createLinearGradient(x, y, x, y + cell);
+      grad.addColorStop(0, '#38bdf8');
+      grad.addColorStop(1, '#1d4ed8');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, y, cell, cell);
+      ctx.fillStyle = 'rgba(255,255,255,0.22)';
+      ctx.beginPath();
+      ctx.arc(x + 48, y + 188, 36, 0, Math.PI * 2);
+      ctx.arc(x + 210, y + 178, 42, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 72px sans-serif';
+      ctx.fillText('di di', x + 128, y + 132);
+      ctx.fillStyle = '#fef08a';
+      ctx.font = 'bold 24px sans-serif';
+      ctx.fillText('SOĞUK ÇAY', x + 128, y + 180);
+    }
+
+    // 2: Pepsi fridge header
+    {
+      const [x, y] = pos(2);
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(x, y, cell, cell);
+      // Red/White/Blue circle globe
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.arc(x + 62, y + 128, 36, Math.PI, 0);
+      ctx.fill();
+      ctx.fillStyle = '#2563eb';
+      ctx.beginPath();
+      ctx.arc(x + 62, y + 128, 36, 0, Math.PI);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x + 26, y + 118, 72, 20);
+      ctx.font = '900 44px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('pepsi', x + 112, y + 144);
+      ctx.textAlign = 'center';
+    }
+
+    // 3: Patos red chips header
+    {
+      const [x, y] = pos(3);
+      ctx.fillStyle = '#b91c1c';
+      ctx.fillRect(x, y, cell, cell);
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillRect(x + 16, y + 20, cell - 32, cell - 40);
+      ctx.fillStyle = '#dc2626';
+      ctx.fillRect(x + 24, y + 28, cell - 48, cell - 56);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 58px sans-serif';
+      ctx.fillText('Patos', x + 128, y + 135);
+      ctx.fillStyle = '#fef08a';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.fillText('ÇITIR LEZZETLER', x + 128, y + 178);
+    }
+
+    // 4: Z13 Blue Door Plaque + Yupo header split
+    {
+      const [x, y] = pos(4);
+      // Top half: Z13 plaque
+      ctx.fillStyle = '#1d4ed8';
+      ctx.fillRect(x, y, cell, 128);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(x + 12, y + 12, cell - 24, 104);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 66px sans-serif';
+      ctx.fillText('Z13', x + 128, y + 86);
+      // Bottom half: Yupo candy yellow header
+      ctx.fillStyle = '#facc15';
+      ctx.fillRect(x, y + 128, cell, 128);
+      ctx.fillStyle = '#dc2626';
+      ctx.font = '900 54px sans-serif';
+      ctx.fillText('YUPO', x + 128, y + 214);
+    }
+
+    // 5: PUSULA stand graphic
+    {
+      const [x, y] = pos(5);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(x, y, cell, cell);
+      ctx.fillStyle = '#0ea5e9';
+      ctx.fillRect(x, y, cell, 36);
+      ctx.fillRect(x, y + cell - 36, cell, 36);
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '900 46px sans-serif';
+      ctx.fillText('PUSULA', x + 128, y + 132);
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 20px sans-serif';
+      ctx.fillText('TOKAT ÖZEL', x + 128, y + 172);
+    }
+
+    // 6: Taped Wall Price List (Vitrine/Kasa Wall)
+    {
+      const [x, y] = pos(6);
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(x, y, cell, cell);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(x + 8, y + 8, cell - 16, cell - 16);
+      ctx.fillStyle = '#0f172a';
+      ctx.font = '900 26px sans-serif';
+      ctx.fillText('FİYAT LİSTESİ', x + 128, y + 48);
+      ctx.textAlign = 'left';
+      const items = [
+        ['Poğaça / Simit', '20 ₺'],
+        ['Tokat Pidesi', '45 ₺'],
+        ['Kaşarlı Tost', '65 ₺'],
+        ['Sıcak Çay', '15 ₺'],
+        ['Zile Pekmezi', '160 ₺'],
+        ['Tokat Yaprağı', '180 ₺']
+      ];
+      ctx.font = 'bold 19px sans-serif';
+      for (let i = 0; i < items.length; i++) {
+        const ry = y + 86 + i * 27;
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(x + 190, ry - 17, 48, 22);
+        ctx.fillStyle = '#1e293b';
+        ctx.fillText(items[i][0], x + 20, ry);
+        ctx.fillText(items[i][1], x + 194, ry);
+      }
+      ctx.textAlign = 'center';
+    }
+
+    // 7: Photocopier Price Note ("Fotokopi 10 TL / Bilgisayar Çıktı 20 TL") + Teno Logo
+    {
+      const [x, y] = pos(7);
+      // Top half: Copier paper note
+      ctx.fillStyle = '#fffef7';
+      ctx.fillRect(x, y, cell, 128);
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(x + 8, y + 8, cell - 16, 112);
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 26px sans-serif';
+      ctx.fillText('Fotokopi : 10 ₺', x + 128, y + 54);
+      ctx.fillText('Bilg. Çıktı : 20 ₺', x + 128, y + 96);
+      // Bottom half: TENO cardboard print
+      ctx.fillStyle = '#b48a5a';
+      ctx.fillRect(x, y + 128, cell, 128);
+      ctx.fillStyle = '#1e3a8a';
+      ctx.font = '900 54px sans-serif';
+      ctx.fillText('Teno', x + 128, y + 206);
+    }
+
+    ctx.textAlign = 'left';
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.generateMipmaps = true;
     tex.minFilter = THREE.LinearMipmapLinearFilter;
     tex.magFilter = THREE.LinearFilter;
     tex.needsUpdate = true;
-    this.shopAtlas = tex;
+    this.signAtlas = tex;
   }
 
-  _buildClothAtlas(imgSofra) {
-    // 512x512 atlas: 3x2 grid of 6 real sofra bezi patterns from 21.19.51 (2).jpeg
+  _buildClothAtlas() {
+    // 100% Procedural Tokat Yazması & Sofra Bezi floral patterns (with gold coin/pul oyalı borders!)
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 512;
     const ctx = canvas.getContext('2d');
 
-    const crops = [
-      { sx: 0.51, sy: 0.21, sw: 0.18, sh: 0.20, fb: '#4a154b' }, // 0: Plum floral yazma
-      { sx: 0.46, sy: 0.40, sw: 0.19, sh: 0.21, fb: '#1e1b24' }, // 1: Black floral gold-coin oyali
-      { sx: 0.37, sy: 0.23, sw: 0.14, sh: 0.17, fb: '#eab308' }, // 2: Bright yellow Tokat yazma
-      { sx: 0.22, sy: 0.26, sw: 0.14, sh: 0.14, fb: '#60a5fa' }, // 3: Sky blue floral cloth
-      { sx: 0.15, sy: 0.38, sw: 0.16, sh: 0.12, fb: '#dc2626' }, // 4: Red-white striped cloth
-      { sx: 0.03, sy: 0.41, sw: 0.13, sh: 0.15, fb: '#bef264' }  // 5: Lime green/yellow cloth
-    ];
+    const baseBg = '#311238'; // Rich plum/eggplant yazma backdrop
+    ctx.fillStyle = baseBg;
+    ctx.fillRect(0, 0, 512, 512);
 
-    const w = 170;
-    const h = 256;
-    for (let i = 0; i < crops.length; i++) {
-      const c = crops[i];
-      const tx = (i % 3) * w;
-      const ty = Math.floor(i / 3) * h;
-      ctx.save();
-      ctx.fillStyle = c.fb;
-      ctx.fillRect(tx, ty, w, h);
-      if (imgSofra && imgSofra.naturalWidth > 0) {
-        const iw = imgSofra.naturalWidth;
-        const ih = imgSofra.naturalHeight;
-        ctx.drawImage(imgSofra, c.sx * iw, c.sy * ih, c.sw * iw, c.sh * ih, tx, ty, w, h);
+    // Traditional block-print floral motifs across the fabric
+    const drawFlower = (cx, cy, r) => {
+      const petals = ['#ef4444', '#facc15', '#38bdf8', '#f8fafc', '#22c55e'];
+      for (let p = 0; p < 6; p++) {
+        const a = (p / 6) * Math.PI * 2;
+        ctx.fillStyle = petals[p % petals.length];
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(a) * r * 0.55, cy + Math.sin(a) * r * 0.55, r * 0.34, 0, Math.PI * 2);
+        ctx.fill();
       }
-      ctx.restore();
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.28, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    for (let gx = 48; gx < 512; gx += 96) {
+      for (let gy = 48; gy < 512; gy += 96) {
+        drawFlower(gx, gy, 30);
+        // Connecting leaf vines
+        ctx.strokeStyle = '#4ade80';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(gx - 28, gy + 28);
+        ctx.lineTo(gx + 28, gy - 28);
+        ctx.stroke();
+      }
+    }
+
+    // Gold coin / pul (oya) border along the 4 edges!
+    ctx.fillStyle = '#facc15';
+    for (let i = 16; i < 512; i += 24) {
+      ctx.beginPath();
+      ctx.arc(i, 12, 7, 0, Math.PI * 2);
+      ctx.arc(i, 500, 7, 0, Math.PI * 2);
+      ctx.arc(12, i, 7, 0, Math.PI * 2);
+      ctx.arc(500, i, 7, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.generateMipmaps = true;
     tex.minFilter = THREE.LinearMipmapLinearFilter;
-    tex.magFilter = THREE.LinearFilter;
     tex.needsUpdate = true;
     this.clothAtlas = tex;
   }
@@ -283,11 +297,9 @@ export class TextureFactory {
     canvas.height = 512;
     const ctx = canvas.getContext('2d');
 
-    // Slight cream A5 paper
     ctx.fillStyle = '#fdfbf3';
     ctx.fillRect(0, 0, 512, 512);
 
-    // Subtle paper border & ruled lines
     ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
     ctx.lineWidth = 2;
     for (let y = 110; y < 470; y += 54) {
@@ -297,8 +309,8 @@ export class TextureFactory {
       ctx.stroke();
     }
 
-    // Masking tape strips at top-left and top-right corners
-    ctx.fillStyle = 'rgba(245, 222, 160, 0.85)';
+    // Masking tape strips
+    ctx.fillStyle = 'rgba(245, 222, 160, 0.88)';
     ctx.save();
     ctx.translate(78, 36);
     ctx.rotate(-0.26);
@@ -311,7 +323,6 @@ export class TextureFactory {
     ctx.fillRect(-52, -16, 104, 32);
     ctx.restore();
 
-    // Title & exact legend password
     ctx.fillStyle = '#0f172a';
     ctx.textAlign = 'center';
     ctx.font = '900 44px "Marker Felt", "Comic Sans MS", sans-serif';
@@ -324,7 +335,6 @@ export class TextureFactory {
     ctx.lineTo(406, 166);
     ctx.stroke();
 
-    // Password lines clearly legible from cashier view
     ctx.fillStyle = '#1e3a8a';
     ctx.font = '900 50px "Courier New", monospace';
     ctx.fillText('2 33 444', 256, 250);
@@ -333,7 +343,7 @@ export class TextureFactory {
 
     ctx.fillStyle = '#64748b';
     ctx.font = 'bold 20px sans-serif';
-    ctx.fillText('(Sadece Kasiyer Görür)', 256, 466);
+    ctx.fillText('(Kasiyer Notu)', 256, 466);
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -368,7 +378,6 @@ export class TextureFactory {
     ctx.fillStyle = '#090d16';
     ctx.fillRect(0, 0, 1024, 512);
 
-    // Header bar
     ctx.fillStyle = '#142038';
     ctx.fillRect(0, 0, 1024, 78);
     ctx.fillStyle = '#fbbf24';
@@ -413,13 +422,11 @@ export class TextureFactory {
       ctx.fillText(status, 795, y - 5);
     }
 
-    // Bottom scrolling ticker
     ctx.fillStyle = '#1e293b';
     ctx.fillRect(0, 450, 1024, 62);
     const tickerText =
       '★ EMİN BÜFE (Z13) HİZMETİNİZDE: SICAK BÖREK, ZİLE PEKMEZİ, TOKAT YAPRAĞI, SOFRA BEZİ, SOĞUK İÇECEKLER VE EFSANE Wİ-Fİ! ★   ';
-    const speed = 90;
-    const offset = (this._boardPhase * speed) % 1500;
+    const offset = (this._boardPhase * 90) % 1500;
     ctx.fillStyle = '#fde68a';
     ctx.font = 'bold 24px sans-serif';
     ctx.fillText(tickerText + tickerText, 1024 - offset, 490);
@@ -436,11 +443,9 @@ export class TextureFactory {
     ctx.fillStyle = '#cfd5dd';
     ctx.fillRect(0, 0, 512, 512);
 
-    // Subtle porcelain tile sheen variations
     for (let gx = 0; gx < 4; gx++) {
       for (let gy = 0; gy < 4; gy++) {
-        const shade = (gx + gy) % 2 === 0 ? '#d8dde4' : '#ced4dc';
-        ctx.fillStyle = shade;
+        ctx.fillStyle = (gx + gy) % 2 === 0 ? '#d8dde4' : '#ced4dc';
         ctx.fillRect(gx * 128 + 3, gy * 128 + 3, 122, 122);
       }
     }

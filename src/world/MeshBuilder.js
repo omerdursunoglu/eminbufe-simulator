@@ -3,9 +3,9 @@ import { TextureFactory } from './TextureFactory.js';
 
 const _tmpColor = new THREE.Color();
 
-export function pushColoredBox(bucket, w, h, d, x, y, z, hex, rx = 0, ry = 0, rz = 0) {
-  const geo = new THREE.BoxGeometry(w, h, d).toNonIndexed();
-  geo.deleteAttribute('uv');
+function paintAndPush(bucket, geo, x, y, z, hex, rx = 0, ry = 0, rz = 0) {
+  if (geo.index) geo = geo.toNonIndexed();
+  if (geo.attributes.uv) geo.deleteAttribute('uv');
   if (rx) geo.rotateX(rx);
   if (ry) geo.rotateY(ry);
   if (rz) geo.rotateZ(rz);
@@ -23,6 +23,33 @@ export function pushColoredBox(bucket, w, h, d, x, y, z, hex, rx = 0, ry = 0, rz
   bucket.push(geo);
 }
 
+export function pushColoredBox(bucket, w, h, d, x, y, z, hex, rx = 0, ry = 0, rz = 0) {
+  paintAndPush(bucket, new THREE.BoxGeometry(w, h, d), x, y, z, hex, rx, ry, rz);
+}
+
+export function pushColoredCylinder(
+  bucket,
+  rTop,
+  rBot,
+  h,
+  segs,
+  x,
+  y,
+  z,
+  hex,
+  rx = 0,
+  ry = 0,
+  rz = 0
+) {
+  paintAndPush(bucket, new THREE.CylinderGeometry(rTop, rBot, h, segs), x, y, z, hex, rx, ry, rz);
+}
+
+export function pushColoredSphere(bucket, r, wSeg, hSeg, x, y, z, hex, sy = 1) {
+  const geo = new THREE.SphereGeometry(r, wSeg, hSeg);
+  if (sy !== 1) geo.scale(1, sy, 1);
+  paintAndPush(bucket, geo, x, y, z, hex);
+}
+
 export function pushGlassBox(bucket, w, h, d, x, y, z, ry = 0) {
   const geo = new THREE.BoxGeometry(w, h, d).toNonIndexed();
   geo.deleteAttribute('uv');
@@ -31,9 +58,9 @@ export function pushGlassBox(bucket, w, h, d, x, y, z, ry = 0) {
   bucket.push(geo);
 }
 
-export function pushAtlasPlane(bucket, w, h, x, y, z, ry, atlasIndex, rx = 0, subRect = null) {
+export function pushSignPlane(bucket, w, h, x, y, z, ry, signIndex, rx = 0, subRect = null) {
   const geo = new THREE.PlaneGeometry(w, h).toNonIndexed();
-  const rect = TextureFactory.getAtlasUV(atlasIndex);
+  const rect = TextureFactory.getSignUV(signIndex);
 
   let u0 = rect.u0;
   let u1 = rect.u1;
@@ -50,9 +77,6 @@ export function pushAtlasPlane(bucket, w, h, x, y, z, ry, atlasIndex, rx = 0, su
   }
 
   const uv = geo.attributes.uv;
-  // Standard PlaneGeometry non-indexed has 6 vertices (2 tris):
-  // tri 1: top-left (0,1), bottom-left (0,0), top-right (1,1)
-  // tri 2: bottom-left (0,0), bottom-right (1,0), top-right (1,1)
   for (let i = 0; i < uv.count; i++) {
     const u = uv.getX(i);
     const v = uv.getY(i);

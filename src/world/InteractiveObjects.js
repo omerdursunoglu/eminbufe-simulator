@@ -95,10 +95,10 @@ export class InteractiveObjects {
     const wx = this.bufe.wifiNotePos.x - playerPos.x;
     const wz = this.bufe.wifiNotePos.z - playerPos.z;
     const wDistSq = wx * wx + wz * wz;
-    if (wDistSq < 2.3 * 2.3) {
+    if (wDistSq < 2.2 * 2.2) {
       const inv = 1 / Math.max(0.001, Math.sqrt(wDistSq));
       const dot = (wx * lookForward.x + wz * lookForward.z) * inv;
-      if (dot > 0.35) {
+      if (dot > 0.72) {
         res.type = 'wifi_note';
         res.label = 'Wi-Fi Notunu Oku';
         return res;

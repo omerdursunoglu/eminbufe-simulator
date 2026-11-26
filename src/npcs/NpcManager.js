@@ -174,8 +174,8 @@ export class NpcManager {
       s.speed = 2.5;
       s.state = 'walking_in';
       s.waypoints = [
-        { x: 2.3, z: 2.4 },
-        { x: 2.45, z: 0.45 }
+        { x: 2.55, z: 2.2 },
+        { x: 2.55, z: -0.35 }
       ];
       s.wpIndex = 0;
     } else if (eventType === 'wifi') {
@@ -185,8 +185,8 @@ export class NpcManager {
       s.speed = 2.4;
       s.state = 'walking_in';
       s.waypoints = [
-        { x: 2.6, z: 2.2 },
-        { x: 2.45, z: 0.45 }
+        { x: 2.75, z: 2.2 },
+        { x: 2.55, z: -0.35 }
       ];
       s.wpIndex = 0;
     } else if (eventType === 'sofra') {
@@ -196,9 +196,9 @@ export class NpcManager {
       s.speed = 2.85;
       s.state = 'walking_in';
       s.waypoints = [
-        { x: 3.1, z: 1.6 },
-        { x: 3.1, z: -1.8 },
-        { x: 2.4, z: -4.2 }
+        { x: 2.6, z: 1.6 },
+        { x: 2.35, z: -1.6 },
+        { x: 2.25, z: -3.6 }
       ];
       s.wpIndex = 0;
     }
