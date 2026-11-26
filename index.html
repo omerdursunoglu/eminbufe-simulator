@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Emin Büfe Simülatörü — Tokat Terminali 2026</title>
+  <link rel="stylesheet" href="/src/ui/style.css" />
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Anger / Rage Vignette -->
+  <div id="rage-vignette" class="rage-vignette hidden"></div>
+
+  <!-- Top HUD -->
+  <div id="hud" class="hud hidden">
+    <div class="hud-top-left">
+      <div class="stat-pill">
+        <span class="stat-label">KASA</span>
+        <span id="cash-value" class="stat-value">0 ₺</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">DOLAP</span>
+        <span id="fridge-value" class="stat-value">100%</span>
+      </div>
+      <div class="stat-pill">
+        <span class="stat-label">OLAYLAR</span>
+        <span id="events-value" class="stat-value">0/3</span>
+      </div>
+    </div>
+
+    <div id="quest-box" class="quest-box">
+      <div class="quest-tag">GÖREV</div>
+      <div id="quest-title" class="quest-title">Büfeyi işlet ve müşterileri karşıla</div>
+      <div id="quest-sub" class="quest-sub">Gelen müşterilere kulak ver, stokları takip et.</div>
+    </div>
+
+    <div class="hud-top-right">
+      <button id="btn-sound" class="icon-btn" title="Sesi Aç/Kapat" aria-label="Sesi Aç/Kapat">🔊</button>
+      <button id="btn-debug-toggle" class="debug-toggle-btn" title="FPS & Draw Call">FPS</button>
+      <div id="debug-panel" class="debug-panel hidden">
+        <div>FPS: <strong id="dbg-fps">60</strong></div>
+        <div>Draw Calls: <strong id="dbg-calls">0</strong> / 70</div>
+        <div>Üçgen: <strong id="dbg-tris">0</strong></div>
+        <div>DPR: <strong id="dbg-dpr">1.0</strong></div>
+        <button id="btn-aa-toggle" class="dbg-mini-btn">AA: Açık</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Center Crosshair & Interaction Prompt -->
+  <div id="crosshair" class="crosshair hidden"></div>
+  <div id="interact-prompt" class="interact-prompt hidden">
+    <span id="interact-key" class="interact-key">E</span>
+    <span id="interact-text" class="interact-text">Etkileşim</span>
+  </div>
+
+  <!-- Hold Action Progress Bar (Restock etc.) -->
+  <div id="progress-wrap" class="progress-wrap hidden">
+    <div id="progress-label" class="progress-label">Dolap Dolduruluyor...</div>
+    <div class="progress-track">
+      <div id="progress-fill" class="progress-fill"></div>
+    </div>
+  </div>
+
+  <!-- Inner Voice / Toast Message -->
+  <div id="toast-box" class="toast-box hidden"></div>
+
+  <!-- Dialogue Modal -->
+  <div id="dialogue-overlay" class="dialogue-overlay hidden">
+    <div class="dialogue-card">
+      <div class="dialogue-header">
+        <span id="dlg-speaker" class="dlg-speaker">Müşteri</span>
+        <span id="dlg-badge" class="dlg-badge">OLAY</span>
+      </div>
+      <p id="dlg-text" class="dlg-text"></p>
+      <div id="dlg-options" class="dlg-options"></div>
+    </div>
+  </div>
+
+  <!-- Mobile Controls -->
+  <div id="mobile-controls" class="mobile-controls hidden">
+    <div id="joystick-zone" class="joystick-zone">
+      <div id="joystick-base" class="joystick-base">
+        <div id="joystick-knob" class="joystick-knob"></div>
+      </div>
+    </div>
+    <div id="touch-look-zone" class="touch-look-zone"></div>
+    <div class="mobile-actions">
+      <button id="btn-mobile-sprint" class="mobile-btn sprint-btn" type="button">
+        <span>🏃</span>
+        <small>KOŞ</small>
+      </button>
+      <button id="btn-mobile-interact" class="mobile-btn interact-btn" type="button">
+        <span>✋</span>
+        <small id="mobile-interact-label">ETKİLEŞ</small>
+      </button>
+    </div>
+  </div>
+
+  <!-- Start / Pause Overlay -->
+  <div id="start-overlay" class="start-overlay">
+    <div class="start-card">
+      <div class="start-badge">TOKAT OTOBÜS TERMİNALİ • 2026</div>
+      <h1 class="start-title">EMİN BÜFE SİMÜLATÖRÜ</h1>
+      <p class="start-desc">
+        Modern Tokat Terminali'nin kalbindeki gerçek <strong>Z13 Emin Büfe</strong> tezgâhının başına geç.
+        Dolapları doldur, sofra bezlerine sahip çık, efsane Wi-Fi şifresini ver — gerekirse sopayı kap!
+      </p>
+      <div id="controls-guide" class="controls-guide"></div>
+      <button id="btn-start" class="btn-start" disabled>Dokular Hazırlanıyor...</button>
+      <div class="device-switch-row">
+        <button id="btn-toggle-mode" class="btn-mode-toggle" type="button">Kontrol Modu: Otomatik</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
