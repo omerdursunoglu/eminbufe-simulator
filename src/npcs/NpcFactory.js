@@ -6,44 +6,46 @@ const _quat = new THREE.Quaternion();
 const _scale = new THREE.Vector3(1, 1, 1);
 const _euler = new THREE.Euler();
 const _tmpColor = new THREE.Color();
-const _rootQuat = new THREE.Quaternion();
-const _rootEuler = new THREE.Euler();
-const _localPos = new THREE.Vector3();
-const _localQuat = new THREE.Quaternion();
-const _partPos = new THREE.Vector3();
-const _partQuat = new THREE.Quaternion();
-const _headWorld = new THREE.Vector3();
-const _hairOffset = new THREE.Vector3();
-const _headQuat = new THREE.Quaternion();
 
 /**
- * Renders ALL NPCs + blob shadows using only 5 InstancedMesh draw calls total,
- * keeping scene draw calls ultra-low even with many terminal travelers & customers.
+ * Stylized low-poly rounded characters + traveler backpacks + comic impact sparks + target ring,
+ * keeping total draw calls minimal while supporting beatdowns, sneak crouching, knockdown & loot!
  */
 export class NpcFactory {
   constructor(scene, textures, maxNpcs = 10) {
     this.scene = scene;
     this.maxNpcs = maxNpcs;
 
-    // 1. Heads (sphere/capsule feel)
-    const headGeo = new THREE.BoxGeometry(0.32, 0.34, 0.32);
-    const stdMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const stdMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.72,
+      metalness: 0.05
+    });
+
+    // 1. Rounded Heads (smooth sphere scaled slightly vertical)
+    const headGeo = new THREE.SphereGeometry(0.18, 10, 8);
+    headGeo.scale(0.95, 1.06, 0.98);
     this.headInst = new THREE.InstancedMesh(headGeo, stdMat, maxNpcs);
 
-    // 2. Torsos
-    const torsoGeo = new THREE.BoxGeometry(0.46, 0.62, 0.26);
+    // 2. Tapered Jackets / Torsos
+    const torsoGeo = new THREE.CylinderGeometry(0.24, 0.21, 0.62, 10);
+    torsoGeo.scale(1.0, 1.0, 0.62);
     this.torsoInst = new THREE.InstancedMesh(torsoGeo, stdMat, maxNpcs);
 
-    // 3. Hair / Beanie / Cap
-    const hairGeo = new THREE.BoxGeometry(0.35, 0.14, 0.35);
+    // 3. Hair / Beanie Cap
+    const hairGeo = new THREE.SphereGeometry(0.185, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.58);
     this.hairInst = new THREE.InstancedMesh(hairGeo, stdMat, maxNpcs);
 
-    // 4. Limbs (2 arms + 2 legs per NPC = maxNpcs * 4), pivoted at top joint (shoulder/hip)!
-    const limbGeo = new THREE.BoxGeometry(0.14, 0.56, 0.14);
+    // 4. Capsule-like Limbs (arms + legs pivoted at shoulder/hip)
+    const limbGeo = new THREE.CylinderGeometry(0.068, 0.058, 0.56, 8);
     limbGeo.translate(0, -0.24, 0);
     this.limbInst = new THREE.InstancedMesh(limbGeo, stdMat, maxNpcs * 4);
 
-    // 5. Blob Shadows (1 draw call for all NPC shadows)
+    // 5. Traveler Backpacks (for terminal ambiance on slots 0..2!)
+    const bagGeo = new THREE.BoxGeometry(0.32, 0.42, 0.16);
+    this.bagInst = new THREE.InstancedMesh(bagGeo, stdMat, maxNpcs);
+
+    // 6. Blob Shadows
     const shadowGeo = new THREE.PlaneGeometry(0.85, 0.85);
     shadowGeo.rotateX(-Math.PI * 0.5);
     const shadowMat = new THREE.MeshBasicMaterial({
@@ -53,7 +55,7 @@ export class NpcFactory {
     });
     this.shadowInst = new THREE.InstancedMesh(shadowGeo, shadowMat, maxNpcs);
 
-    // 6. Comic Impact Sparks (1 draw call for all stick-hit burst particles)
+    // 7. Comic Impact Sparks (1 draw call for all hit burst particles)
     this.maxSparks = 16;
     this.sparks = [];
     const sparkGeo = new THREE.OctahedronGeometry(0.085, 0);
@@ -85,7 +87,7 @@ export class NpcFactory {
     this.sparkInst.instanceColor.needsUpdate = true;
     this.sparkInst.instanceMatrix.needsUpdate = true;
 
-    // 7. Pulsing red target ring under fleeing sabotaging NPC (hidden when inactive)
+    // 8. Pulsing red target ring under fleeing NPC
     const ringGeo = new THREE.RingGeometry(0.46, 0.62, 24);
     ringGeo.rotateX(-Math.PI * 0.5);
     const ringMat = new THREE.MeshBasicMaterial({
@@ -98,11 +100,11 @@ export class NpcFactory {
     this.targetRing.position.set(0, 0.04, 0);
     this.targetRing.visible = false;
 
-    // Initialize all instances off-screen
     this.headInst.frustumCulled = false;
     this.torsoInst.frustumCulled = false;
     this.hairInst.frustumCulled = false;
     this.limbInst.frustumCulled = false;
+    this.bagInst.frustumCulled = false;
     this.shadowInst.frustumCulled = false;
 
     for (let i = 0; i < maxNpcs; i++) {
@@ -114,6 +116,7 @@ export class NpcFactory {
     scene.add(this.torsoInst);
     scene.add(this.hairInst);
     scene.add(this.limbInst);
+    scene.add(this.bagInst);
     scene.add(this.shadowInst);
     scene.add(this.sparkInst);
     scene.add(this.targetRing);
@@ -127,6 +130,7 @@ export class NpcFactory {
     this.headInst.setMatrixAt(i, _mat);
     this.torsoInst.setMatrixAt(i, _mat);
     this.hairInst.setMatrixAt(i, _mat);
+    this.bagInst.setMatrixAt(i, _mat);
     this.shadowInst.setMatrixAt(i, _mat);
     for (let k = 0; k < 4; k++) {
       this.limbInst.setMatrixAt(i * 4 + k, _mat);
@@ -138,7 +142,6 @@ export class NpcFactory {
     this.headInst.setColorAt(slot, _tmpColor);
     _tmpColor.setHex(jacketHex);
     this.torsoInst.setColorAt(slot, _tmpColor);
-    // Arms match jacket, legs match pants
     this.limbInst.setColorAt(slot * 4 + 0, _tmpColor);
     this.limbInst.setColorAt(slot * 4 + 1, _tmpColor);
     _tmpColor.setHex(pantsHex);
@@ -146,11 +149,14 @@ export class NpcFactory {
     this.limbInst.setColorAt(slot * 4 + 3, _tmpColor);
     _tmpColor.setHex(hairHex);
     this.hairInst.setColorAt(slot, _tmpColor);
+    _tmpColor.setHex(slot < 3 ? 0x334155 : 0x1e293b);
+    this.bagInst.setColorAt(slot, _tmpColor);
 
     this.headInst.instanceColor.needsUpdate = true;
     this.torsoInst.instanceColor.needsUpdate = true;
     this.limbInst.instanceColor.needsUpdate = true;
     this.hairInst.instanceColor.needsUpdate = true;
+    this.bagInst.instanceColor.needsUpdate = true;
   }
 
   setNpcHitFlash(slot) {
@@ -242,24 +248,22 @@ export class NpcFactory {
     sneakAmt = 0,
     sneakLook = 0
   ) {
-    const strideAmp = sneakAmt > 0 ? 0.36 : 0.55;
+    const strideAmp = sneakAmt > 0 ? 0.36 : 0.52;
     const stride = speed > 0.1 ? Math.sin(walkCycle) * strideAmp : 0;
     const bounceAmp = sneakAmt > 0 ? 0.018 : 0.04;
     const bounce = speed > 0.1 ? Math.abs(Math.cos(walkCycle)) * bounceAmp : 0;
     const cosY = Math.cos(ry);
     const sinY = Math.sin(ry);
-    const armOffsetX = 0.31;
-    const legOffsetX = 0.13;
+    const armOffsetX = 0.29;
+    const legOffsetX = 0.12;
 
     if (knockdownAmt > 0.05) {
-      // Knocked down flat on the terminal floor (lying backward along local -Z)
       const tilt = -knockdownAmt * 1.48;
       const twitch = Math.sin(walkCycle * 3.0) * 0.08 * knockdownAmt;
       const sinT = Math.sin(tilt);
       const cosT = Math.cos(tilt);
       const baseY = 0.65 - knockdownAmt * 0.45;
 
-      // Helper offset rotated around hip/center (0, 0.65, 0) in NPC local space -> world space
       const setFallenPart = (inst, instIdx, lx, ly, lz, rx, ryLocal, rz) => {
         const yOff = ly - 0.65;
         const rLocalY = yOff * cosT - lz * sinT;
@@ -277,11 +281,17 @@ export class NpcFactory {
 
       setFallenPart(this.torsoInst, slot, 0, 0.94, 0, 0, 0, 0);
       setFallenPart(this.headInst, slot, 0, 1.44, 0, twitch, twitch * 1.5, 0);
-      setFallenPart(this.hairInst, slot, 0, 1.62, 0, twitch, twitch * 1.5, 0);
+      setFallenPart(this.hairInst, slot, 0, 1.46, 0, twitch, twitch * 1.5, 0);
       setFallenPart(this.limbInst, slot * 4 + 0, -armOffsetX, 1.18, 0, -0.35 + twitch, 0, 0.55);
       setFallenPart(this.limbInst, slot * 4 + 1, armOffsetX, 1.18, 0, -0.25 - twitch, 0, -0.62);
       setFallenPart(this.limbInst, slot * 4 + 2, -legOffsetX, 0.63, 0, 0.12, 0, 0.16);
       setFallenPart(this.limbInst, slot * 4 + 3, legOffsetX, 0.63, 0, -0.08, 0, -0.18);
+
+      // Hide backpack cleanly when knocked down
+      _pos.set(0, -30, 0);
+      _scale.set(0.0001, 0.0001, 0.0001);
+      _mat.compose(_pos, _quat, _scale);
+      this.bagInst.setMatrixAt(slot, _mat);
 
       _pos.set(x - sinY * 0.55 * knockdownAmt, 0.025, z - cosY * 0.55 * knockdownAmt);
       _euler.set(0, ry, 0, 'YXZ');
@@ -306,7 +316,20 @@ export class NpcFactory {
     _mat.compose(_pos, _quat, _scale);
     this.torsoInst.setMatrixAt(slot, _mat);
 
-    // Head (with furtive left/right sneak glance)
+    // Backpack on ambient terminal passengers (slots 0..2)
+    if (slot < 3) {
+      _pos.set(x - sinY * 0.19, 0.98 + bounce + crouchY, z - cosY * 0.19);
+      _mat.compose(_pos, _quat, _scale);
+      this.bagInst.setMatrixAt(slot, _mat);
+    } else {
+      _pos.set(0, -30, 0);
+      _scale.set(0.0001, 0.0001, 0.0001);
+      _mat.compose(_pos, _quat, _scale);
+      this.bagInst.setMatrixAt(slot, _mat);
+      _scale.set(1, 1, 1);
+    }
+
+    // Head & Hair Cap
     const headYaw = ry + sneakLook * sneakAmt;
     _pos.set(
       x + sinY * (0.14 * sneakAmt),
@@ -323,20 +346,17 @@ export class NpcFactory {
     _mat.compose(_pos, _quat, _scale);
     this.headInst.setMatrixAt(slot, _mat);
 
-    // Hair / Hat
-    _pos.y += 0.18;
+    _pos.y += 0.02;
     _mat.compose(_pos, _quat, _scale);
     this.hairInst.setMatrixAt(slot, _mat);
 
     // Shadow
     _pos.set(x, 0.025, z);
     _quat.identity();
-    _scale.set(1, 1, 1);
     _mat.compose(_pos, _quat, _scale);
     this.shadowInst.setMatrixAt(slot, _mat);
 
-    // Limbs pivoted from shoulder/hip: 0=armL, 1=armR, 2=legL, 3=legR
-    // Left Arm (shoulder at Y=1.20)
+    // Limbs pivoted from shoulder/hip
     const armLPitch =
       staggerAmt > 0
         ? -2.85
@@ -360,7 +380,6 @@ export class NpcFactory {
     _mat.compose(_pos, _quat, _scale);
     this.limbInst.setMatrixAt(slot * 4 + 0, _mat);
 
-    // Right Arm (shoulder at Y=1.20)
     const armRPitch =
       staggerAmt > 0
         ? -2.75
@@ -386,14 +405,12 @@ export class NpcFactory {
     _mat.compose(_pos, _quat, _scale);
     this.limbInst.setMatrixAt(slot * 4 + 1, _mat);
 
-    // Left Leg (hip at Y=0.63)
     _pos.set(x + cosY * -legOffsetX, 0.63 + bounce * 0.4 + crouchY * 0.65, z - sinY * -legOffsetX);
     _euler.set(stride - 0.18 * sneakAmt, ry, 0, 'YXZ');
     _quat.setFromEuler(_euler);
     _mat.compose(_pos, _quat, _scale);
     this.limbInst.setMatrixAt(slot * 4 + 2, _mat);
 
-    // Right Leg (hip at Y=0.63)
     _pos.set(x + cosY * legOffsetX, 0.63 + bounce * 0.4 + crouchY * 0.65, z - sinY * legOffsetX);
     _euler.set(-stride + 0.12 * sneakAmt, ry, 0, 'YXZ');
     _quat.setFromEuler(_euler);
@@ -418,6 +435,7 @@ export class NpcFactory {
     this.torsoInst.instanceMatrix.needsUpdate = true;
     this.hairInst.instanceMatrix.needsUpdate = true;
     this.limbInst.instanceMatrix.needsUpdate = true;
+    this.bagInst.instanceMatrix.needsUpdate = true;
     this.shadowInst.instanceMatrix.needsUpdate = true;
   }
 }

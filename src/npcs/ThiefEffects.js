@@ -19,14 +19,14 @@ export class ThiefEffects {
   constructor(scene) {
     this.scene = scene;
 
-    // 1. Bandit eye mask + white eyes (glued directly to thief head matrix)
+    // 1. Bandit eye mask + white eyes (sized cleanly for rounded Sphere head)
     const maskParts = [];
-    pushColoredBox(maskParts, 0.338, 0.105, 0.338, 0, 0.03, 0, 0x09090b);
-    pushColoredBox(maskParts, 0.068, 0.035, 0.025, -0.072, 0.034, 0.172, 0xf8fafc, 0, 0, -0.18);
-    pushColoredBox(maskParts, 0.068, 0.035, 0.025, 0.072, 0.034, 0.172, 0xf8fafc, 0, 0, 0.18);
+    pushColoredBox(maskParts, 0.36, 0.1, 0.365, 0, 0.02, 0, 0x09090b);
+    pushColoredBox(maskParts, 0.068, 0.035, 0.025, -0.072, 0.024, 0.188, 0xf8fafc, 0, 0, -0.18);
+    pushColoredBox(maskParts, 0.068, 0.035, 0.025, 0.072, 0.024, 0.188, 0xf8fafc, 0, 0, 0.18);
     this.maskMesh = new THREE.Mesh(
       mergeGeometries(maskParts, false),
-      new THREE.MeshLambertMaterial({ vertexColors: true })
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75 })
     );
     this.maskMesh.matrixAutoUpdate = false;
     this.maskMesh.visible = false;
@@ -34,12 +34,12 @@ export class ThiefEffects {
 
     // 2. Burlap loot sack on back (glued directly to thief torso matrix)
     const sackParts = [];
-    pushColoredBox(sackParts, 0.3, 0.36, 0.2, 0, -0.04, -0.23, 0x92400e);
-    pushColoredBox(sackParts, 0.12, 0.08, 0.1, 0, 0.18, -0.23, 0xfacc15);
-    pushColoredBox(sackParts, 0.12, 0.12, 0.03, 0, -0.04, -0.34, 0xfacc15);
+    pushColoredBox(sackParts, 0.3, 0.36, 0.2, 0, -0.04, -0.22, 0x92400e);
+    pushColoredBox(sackParts, 0.12, 0.08, 0.1, 0, 0.18, -0.22, 0xfacc15);
+    pushColoredBox(sackParts, 0.12, 0.12, 0.03, 0, -0.04, -0.33, 0xfacc15);
     this.sackMesh = new THREE.Mesh(
       mergeGeometries(sackParts, false),
-      new THREE.MeshLambertMaterial({ vertexColors: true })
+      new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })
     );
     this.sackMesh.matrixAutoUpdate = false;
     this.sackMesh.visible = false;

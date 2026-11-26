@@ -11,6 +11,7 @@ import { InteractiveObjects } from './world/InteractiveObjects.js';
 import { ViewmodelStick } from './world/ViewmodelStick.js';
 import { NpcFactory } from './npcs/NpcFactory.js';
 import { NpcManager } from './npcs/NpcManager.js';
+import { ThiefEffects } from './npcs/ThiefEffects.js';
 import { QuestState, QuestStateMachine } from './quests/QuestStateMachine.js';
 import { StoryEvents } from './quests/StoryEvents.js';
 
@@ -38,8 +39,9 @@ async function bootstrap() {
   const interactables = new InteractiveObjects(bufe);
   const viewmodel = new ViewmodelStick(engine.camera);
 
-  const npcFactory = new NpcFactory(engine.scene, textures, 6);
+  const npcFactory = new NpcFactory(engine.scene, textures, 8);
   const npcManager = new NpcManager(npcFactory, bufe, sound, colliders);
+  const thiefEffects = new ThiefEffects(engine.scene);
 
   const qsm = new QuestStateMachine();
   const story = new StoryEvents(qsm, bufe, npcManager, viewmodel, engine, ui, input, sound);
@@ -58,6 +60,8 @@ async function bootstrap() {
   let debugUpdateAccum = 0;
   let frameCount = 0;
   let fpsAvg = 60;
+  let holdPunchAccum = 0;
+  let thiefHpHudShown = false;
 
   // UI Event Bindings
   ui.setReady();
@@ -148,33 +152,70 @@ async function bootstrap() {
         playerPos.x += (_forward.x * ny + _right.x * nx) * step;
         playerPos.z += (_forward.z * ny + _right.z * nx) * step;
         colliders.resolve(playerPos, 0.3);
+        npcManager.applyPlayerThiefSeparation(playerPos);
       }
     }
 
     engine.applyCamera(playerPos.x, playerPos.z, dt, moveRatio, input.sprint);
+    engine.getCameraForward(_lookForward);
     viewmodel.update(dt, moveRatio, input.sprint);
     sound.update(dt, moveRatio > 0.1, input.sprint);
     ui.setSprintIndicator(input.sprint && moveRatio > 0.1 && !input.dialogueOpen);
 
     // NPCs & Quest State Machine
-    npcManager.update(dt, playerPos, {
-      onStoryNpcArrived: (t) => story.onStoryNpcArrived(t),
-      onSabotageStart: () => story.onSabotageStart(),
-      onSabotageScattered: () => story.onSabotageScattered(),
-      onSofraTaunt: () => story.onSofraTaunt(),
-      onChaseEscapedExit: () => story.onChaseEscapedExit()
-    });
+    npcManager.update(
+      dt,
+      playerPos,
+      {
+        onStoryNpcArrived: (t) => story.onStoryNpcArrived(t),
+        onSabotageStart: () => story.onSabotageStart(),
+        onSabotageScattered: () => story.onSabotageScattered(),
+        onSofraTaunt: () => story.onSofraTaunt(),
+        onChaseEscapedExit: () => story.onChaseEscapedExit(),
+        onThiefSpotted: () => story.onThiefSpotted(),
+        onThiefStealing: () => story.onThiefStealing(),
+        onThiefStole: (amt) => story.onThiefStole(amt),
+        onThiefEscaped: (stolen) => story.onThiefEscaped(stolen)
+      },
+      _lookForward,
+      input.dialogueOpen
+    );
+    thiefEffects.update(npcManager.thiefNpc, npcFactory);
 
-    engine.getCameraForward(_lookForward);
     const target = interactables.findNearest(playerPos, _lookForward, npcManager, qsm);
     const isChase =
       qsm.state === QuestState.EVENT_ICECREAM_CHASE ||
       qsm.state === QuestState.EVENT_SOFRABEZI_CHASE;
-    const inHitRange = isChase && npcManager.isStoryNpcInHitRange(playerPos, _lookForward, 2.65);
+    const thiefBeatable = npcManager.isThiefBeatable();
+    const thiefDist = thiefBeatable
+      ? Math.hypot(npcManager.thiefNpc.x - playerPos.x, npcManager.thiefNpc.z - playerPos.z)
+      : 999;
+    viewmodel.setCombatReady(thiefBeatable && thiefDist < 4.8 && !input.dialogueOpen);
+
+    const thiefInRange = npcManager.isThiefInHitRange(playerPos, _lookForward, 3.05);
+    const inHitRange =
+      (isChase && npcManager.isStoryNpcInHitRange(playerPos, _lookForward, 2.65)) || thiefInRange;
     ui.setCrosshairHot(inHitRange);
+
+    if (qsm.state !== QuestState.EVENT_SOFRABEZI_CHASE) {
+      const showThiefHp =
+        !input.dialogueOpen &&
+        npcManager.isThiefSpottedAlert() &&
+        (thiefDist < 9.5 || npcManager.thiefNpc.hitCount > 0);
+      if (showThiefHp) {
+        const tn = npcManager.thiefNpc;
+        ui.setNpcHealth(true, 'SİNSİ HIRSIZ', tn.hp, tn.maxHp);
+        thiefHpHudShown = true;
+      } else if (thiefHpHudShown) {
+        ui.setNpcHealth(false);
+        thiefHpHudShown = false;
+      }
+    }
 
     if (input.dialogueOpen) {
       ui.setInteractPrompt(false);
+    } else if (target.type === 'thief') {
+      ui.setInteractPrompt(true, target.label, input.effectiveMobile(), target.keyLabel);
     } else if (isChase) {
       if (inHitRange) {
         ui.setInteractPrompt(true, 'SOPAYLA VUR!', input.effectiveMobile(), 'Tık/E');
@@ -194,11 +235,32 @@ async function bootstrap() {
       ui.setInteractPrompt(false);
     }
 
-    if (input.consumeInteractPress() && !input.dialogueOpen) {
-      if (isChase) {
-        story.onStickSwing(playerPos, _lookForward);
+    const interactPressed = input.consumeInteractPress();
+    const punchPressed = input.consumePunchPress();
+    if (!input.dialogueOpen) {
+      if (punchPressed) {
+        story.onThiefStrike(playerPos, _lookForward);
+        holdPunchAccum = 0;
+      } else if (interactPressed) {
+        if (target.type === 'thief') {
+          story.onThiefStrike(playerPos, _lookForward);
+          holdPunchAccum = 0;
+        } else if (isChase) {
+          story.onStickSwing(playerPos, _lookForward);
+        } else if (target.type === 'none' && thiefBeatable && thiefDist < 5.2) {
+          story.onThiefStrike(playerPos, _lookForward);
+          holdPunchAccum = 0;
+        } else {
+          story.handleInteraction(target);
+        }
+      } else if (target.type === 'thief' && input.interactHeld) {
+        holdPunchAccum += dt;
+        if (holdPunchAccum >= 0.27) {
+          holdPunchAccum = 0;
+          story.onThiefStrike(playerPos, _lookForward);
+        }
       } else {
-        story.handleInteraction(target);
+        holdPunchAccum = 0;
       }
     }
 

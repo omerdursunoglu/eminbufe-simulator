@@ -23,6 +23,7 @@ export class QuestStateMachine {
 
     this.cash = 150;
     this.eventsCompleted = 0;
+    this.thievesCaught = 0;
     this.completedFlags = {
       icecream: false,
       wifi: false,

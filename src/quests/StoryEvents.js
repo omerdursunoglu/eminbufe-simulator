@@ -46,7 +46,14 @@ export class StoryEvents {
   _syncQuestHud() {
     switch (this.qsm.state) {
       case QuestState.IDLE_NORMAL:
-        if (this.qsm.needsRestock) {
+        if (this.npcs.isThiefSpottedAlert()) {
+          const t = this.npcs.thiefNpc;
+          this.ui.setQuest(
+            `Sinsi Hırsız Yakalandı! (${t.hp}/${t.maxHp} Can)`,
+            'Shift / KOŞ ile yetiş, Sol Tık / E / F ile ÇAT ÇUT yere yatır!',
+            true
+          );
+        } else if (this.qsm.needsRestock) {
           this.ui.setQuest(
             'Buzdolapları Boşaldı — Stokları Doldur!',
             this.qsm.carryingCrate
@@ -57,7 +64,7 @@ export class StoryEvents {
         } else if (this.qsm.eventsCompleted >= 3) {
           this.ui.setQuest(
             'Vardiya Tamamlandı — Büfeyi İşletmeye Devam Et!',
-            'Müşterilere servis yap, stokları dolu tut ve terminalin tadını çıkar.',
+            'Müşterilere servis yap, stokları dolu tut ve sinsi hırsızlara göz açtırma.',
             false
           );
         } else {
@@ -69,13 +76,22 @@ export class StoryEvents {
         }
         break;
       case QuestState.RESTOCK_FRIDGE:
-        this.ui.setQuest(
-          'Buzdolapları Boşaldı — Stokları Doldur!',
-          this.qsm.carryingCrate
-            ? 'Didi veya Pepsi dolabına gidip basılı tutarak rafları doldur!'
-            : 'Arka köşedeki içecek kasasını al.',
-          true
-        );
+        if (this.npcs.isThiefSpottedAlert()) {
+          const t = this.npcs.thiefNpc;
+          this.ui.setQuest(
+            `Sinsi Hırsız Yakalandı! (${t.hp}/${t.maxHp} Can)`,
+            'Shift / KOŞ ile yetiş, Sol Tık / E / F ile ÇAT ÇUT yere yatır!',
+            true
+          );
+        } else {
+          this.ui.setQuest(
+            'Buzdolapları Boşaldı — Stokları Doldur!',
+            this.qsm.carryingCrate
+              ? 'Didi veya Pepsi dolabına gidip basılı tutarak rafları doldur!'
+              : 'Arka köşedeki içecek kasasını al.',
+            true
+          );
+        }
         break;
       case QuestState.EVENT_ICECREAM_APPROACH:
       case QuestState.EVENT_ICECREAM_DIALOG:
@@ -197,10 +213,18 @@ export class StoryEvents {
     this.sound.playStickSwing();
 
     const res = this.npcs.tryHitStoryNpc(playerPos, lookForward, 2.65);
-    if (!res.hit) return;
+    if (!res.hit) {
+      if (this.npcs.isThiefInHitRange(playerPos, lookForward, 3.05)) {
+        this._resolveThiefHit(playerPos, lookForward, 2);
+      }
+      return;
+    }
 
     this.viewmodel.triggerHitBounce();
     this.engine.pulseHitShake(res.knockedOut ? 0.068 : 0.044);
+    const sn = this.npcs.storyNpc;
+    const popText = res.knockedOut ? 'NAKAVT!' : ['PAT!', 'KÜT!', 'BAM!', 'GÜM!'][(res.hitCount - 1) % 4];
+    this.ui.spawnHitPopup(sn.x, 1.65, sn.z, this.engine.camera, popText, res.knockedOut);
 
     if (res.type === 'sofra') {
       this.ui.setNpcHealth(true, 'SOFRABEZİ SABOTAJCISI', res.hp, res.maxHp);
@@ -252,6 +276,114 @@ export class StoryEvents {
     this._syncHudStats();
     this._syncQuestHud();
     this._checkAllEventsDone();
+  }
+
+  onThiefSpotted() {
+    this.sound.playThiefSpotted();
+    this.ui.showToast(
+      'Şşşt! Maskeli hırsız çaktırmadan süzülüyor — koşarak döv ve yere yatır!',
+      3800,
+      true
+    );
+    this._syncQuestHud();
+  }
+
+  onThiefStealing() {
+    this.ui.showToast('Hırsız mallara uzanıyor! Koş yetiş, ÇAT ÇUT patakla!', 2800, true);
+    this._syncQuestHud();
+  }
+
+  onThiefStole(amount) {
+    const taken = Math.min(amount, this.qsm.cash);
+    this.qsm.cash -= taken;
+    this.npcs.thiefNpc.stolenAmount = taken;
+    this.sound.playThiefStole();
+    this.ui.triggerRageVignette(1800);
+    this.ui.showToast(
+      taken > 0
+        ? `Hırsız ${taken} ₺ kaptı kaçıyor! Peşinden koş, ÇAT ÇUT yere yatır!`
+        : 'Hırsız tezgâhı karıştırdı kaçıyor! Koş döv!',
+      3600,
+      true
+    );
+    this._syncHudStats();
+    this._syncQuestHud();
+  }
+
+  onThiefEscaped(stolen) {
+    if (this.qsm.state !== QuestState.EVENT_SOFRABEZI_CHASE) {
+      this.ui.setNpcHealth(false);
+    }
+    this.ui.showToast(
+      stolen > 0
+        ? `Hırsız ${stolen} ₺ ile terminal kapısından sıvıştı!`
+        : 'Hırsız yakalanmadan terminal kapısından sıvıştı!',
+      3200
+    );
+    this._syncQuestHud();
+  }
+
+  onThiefStrike(playerPos, lookForward) {
+    if (this.viewmodel.active) {
+      if (!this.viewmodel.canSwing()) return false;
+      this.viewmodel.triggerSwing();
+    } else {
+      if (!this.viewmodel.canPunch()) return false;
+      this.viewmodel.triggerPunch();
+    }
+
+    const dmg = this.viewmodel.active ? 2 : 1;
+    const hit = this._resolveThiefHit(playerPos, lookForward, dmg);
+    if (!hit) {
+      this.sound.playStickSwing();
+    }
+    return hit;
+  }
+
+  _resolveThiefHit(playerPos, lookForward, dmg) {
+    const res = this.npcs.tryHitThief(playerPos, lookForward, dmg, 3.05);
+    if (!res.hit) return false;
+
+    if (this.viewmodel.active) this.viewmodel.triggerHitBounce();
+    this.engine.pulseHitShake(res.knockedOut ? 0.068 : 0.038);
+    this.sound.playPunchHit(res.hitCount - 1, res.knockedOut);
+
+    const popText = res.knockedOut
+      ? 'NAKAVT!'
+      : ['ÇAT!', 'ÇUT!', 'PAT!', 'GÜM!'][(res.hitCount - 1) % 4];
+    this.ui.spawnHitPopup(res.x, res.y + 0.25, res.z, this.engine.camera, popText, res.knockedOut);
+
+    if (res.knockedOut) {
+      this.sound.playKnockout();
+      this.qsm.thievesCaught++;
+      const bounty = 100;
+      const recovered = res.stolenRecovered || 0;
+      this.qsm.cash += bounty + recovered;
+      setTimeout(() => this.sound.playCashRegister(), 180);
+      if (this.qsm.state !== QuestState.EVENT_SOFRABEZI_CHASE) {
+        this.ui.setNpcHealth(false);
+      }
+      this.ui.showToast(
+        recovered > 0
+          ? `ÇAT ÇUT YERE SERİLDİ! Çalınan ${recovered} ₺ kurtarıldı + ${bounty} ₺ Ödül!`
+          : `ÇAT ÇUT YERE SERİLDİ! Hırsız nakavt oldu (+${bounty} ₺ Ödül)`,
+        4200
+      );
+      this._syncHudStats();
+      this._syncQuestHud();
+    } else {
+      if (this.qsm.state !== QuestState.EVENT_SOFRABEZI_CHASE) {
+        this.ui.setNpcHealth(true, 'SİNSİ HIRSIZ', res.hp, res.maxHp);
+      }
+      const reactions = [
+        'ÇAT! — Hırsız: "AHH! Dur usta öylesine bakıyordum!"',
+        'ÇUT! — Hırsız: "Vurma abi bir daha yapmam!"',
+        'PAT! — Hırsız: "AYY BELİM GİTTİ!"'
+      ];
+      this.ui.showToast(reactions[(res.hitCount - 1) % reactions.length], 2200, true);
+      this._syncQuestHud();
+    }
+    return true;
   }
 
   handleInteraction(target) {
@@ -469,8 +601,8 @@ export class StoryEvents {
       }
     }
 
-    // Trigger next scripted event cleanly when idle
-    if (this.qsm.canStartNewEvent() && !this.qsm.needsRestock) {
+    // Trigger next scripted event cleanly when idle (pause countdown during active thief combat)
+    if (this.qsm.canStartNewEvent() && !this.qsm.needsRestock && !this.npcs.isThiefEngaged()) {
       this.nextEventTimer -= dt;
       if (this.nextEventTimer <= 0) {
         if (this.eventQueue.length === 0) {
